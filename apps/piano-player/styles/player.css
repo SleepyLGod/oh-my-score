@@ -316,12 +316,14 @@ input[type="color"] {
     justify-content: space-between;
     gap: 12px;
 }
-.keyboard-map {
+.keyboard-map,
+.smart-score {
     margin-top: 14px;
     padding-top: 14px;
     border-top: 1px solid var(--line);
 }
-.keyboard-map summary {
+.keyboard-map summary,
+.smart-score summary {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -329,16 +331,19 @@ input[type="color"] {
     cursor: pointer;
     list-style: none;
 }
-.keyboard-map summary::-webkit-details-marker {
+.keyboard-map summary::-webkit-details-marker,
+.smart-score summary::-webkit-details-marker {
     display: none;
 }
-.keyboard-map summary::after {
+.keyboard-map summary::after,
+.smart-score summary::after {
     content: "Expand";
     color: var(--accent);
     font-size: 12px;
     font-weight: 700;
 }
-.keyboard-map[open] summary::after {
+.keyboard-map[open] summary::after,
+.smart-score[open] summary::after {
     content: "Collapse";
 }
 .key-grid {
@@ -372,6 +377,39 @@ kbd small {
     color: var(--muted);
     font-size: 10px;
     line-height: 1;
+}
+.smart-score {
+    display: grid;
+    gap: 10px;
+}
+#analysis-status {
+    margin: 12px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+.analysis-grid {
+    display: grid;
+    grid-template-columns: minmax(82px, auto) minmax(0, 1fr);
+    gap: 7px 12px;
+    margin-top: 12px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.055);
+}
+.analysis-grid span {
+    color: var(--muted);
+    font-size: 11px;
+}
+.analysis-grid strong {
+    min-width: 0;
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 750;
+    text-align: right;
+    overflow-wrap: anywhere;
 }
 .value-readout {
     font-variant-numeric: tabular-nums;

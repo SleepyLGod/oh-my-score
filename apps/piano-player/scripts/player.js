@@ -36,6 +36,16 @@ var resetViewButton = document.getElementById("reset-view-button");
 var lowerKeyRow = document.getElementById("lower-key-row");
 var middleKeyRow = document.getElementById("middle-key-row");
 var upperKeyRow = document.getElementById("upper-key-row");
+var analysisStatus = document.getElementById("analysis-status");
+var analysisDuration = document.getElementById("analysis-duration");
+var analysisTempo = document.getElementById("analysis-tempo");
+var analysisTracks = document.getElementById("analysis-tracks");
+var analysisChannels = document.getElementById("analysis-channels");
+var analysisPrograms = document.getElementById("analysis-programs");
+var analysisNotes = document.getElementById("analysis-notes");
+var analysisPitchRange = document.getElementById("analysis-pitch-range");
+var analysisPolyphony = document.getElementById("analysis-polyphony");
+var analysisRequestId = 0;
 var noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 var keyboardLayoutRows = [
     {
@@ -136,6 +146,305 @@ function formatBytes(bytes) {
     return (kilobytes / 1024).toFixed(1) + " MB";
 }
 
+function formatDuration(seconds) {
+    if (!isFinite(seconds) || seconds < 0) return "--";
+    var totalSeconds = Math.round(seconds);
+    var minutes = Math.floor(totalSeconds / 60);
+    var remainingSeconds = totalSeconds % 60;
+    return minutes + ":" + String(remainingSeconds).padStart(2, "0");
+}
+
+function formatCount(count, singular, plural) {
+    var label = count === 1 ? singular : plural;
+    return count + " " + label;
+}
+
+function midiNoteName(noteNumber) {
+    return noteNames[noteNumber % 12] + (Math.floor(noteNumber / 12) - 1);
+}
+
+function resetMidiAnalysis(message) {
+    analysisStatus.textContent = message || "Load a MIDI file to inspect score details.";
+    analysisDuration.textContent = "--";
+    analysisTempo.textContent = "--";
+    analysisTracks.textContent = "--";
+    analysisChannels.textContent = "--";
+    analysisPrograms.textContent = "--";
+    analysisNotes.textContent = "--";
+    analysisPitchRange.textContent = "--";
+    analysisPolyphony.textContent = "--";
+}
+
+function updateMidiAnalysis(summary) {
+    analysisStatus.textContent = "Analysis ready";
+    analysisDuration.textContent = formatDuration(summary.durationSeconds);
+    analysisTempo.textContent = summary.tempoLabel;
+    analysisTracks.textContent = formatCount(summary.trackCount, "track", "tracks");
+    analysisChannels.textContent = formatCount(summary.channelCount, "channel", "channels");
+    analysisPrograms.textContent = summary.programLabel;
+    analysisNotes.textContent = formatCount(summary.noteCount, "note", "notes");
+    analysisPitchRange.textContent = summary.pitchRangeLabel;
+    analysisPolyphony.textContent = summary.maxPolyphony + " max";
+}
+
+function analyzeMidiUrl(url) {
+    var requestId = ++analysisRequestId;
+    resetMidiAnalysis("Analyzing MIDI...");
+
+    fetch(url).then(function (response) {
+        if (!response.ok) {
+            throw new Error("Unable to read MIDI file");
+        }
+        return response.arrayBuffer();
+    }).then(function (arrayBuffer) {
+        if (requestId !== analysisRequestId) return;
+        updateMidiAnalysis(parseMidiAnalysis(new Uint8Array(arrayBuffer)));
+    }).catch(function (error) {
+        if (requestId !== analysisRequestId) return;
+        console.warn(error);
+        resetMidiAnalysis("MIDI analysis unavailable. Playback may still work.");
+    });
+}
+
+function readUint16(bytes, offset) {
+    return (bytes[offset] << 8) | bytes[offset + 1];
+}
+
+function readUint32(bytes, offset) {
+    return ((bytes[offset] << 24) >>> 0) + (bytes[offset + 1] << 16) + (bytes[offset + 2] << 8) + bytes[offset + 3];
+}
+
+function bytesToText(bytes, offset, length) {
+    var text = "";
+    for (var i = 0; i < length; i += 1) {
+        text += String.fromCharCode(bytes[offset + i]);
+    }
+    return text;
+}
+
+function readVarLength(bytes, state, limit) {
+    var value = 0;
+    var byteValue;
+    do {
+        if (state.offset >= limit) {
+            throw new Error("Unexpected end of MIDI variable length value");
+        }
+        byteValue = bytes[state.offset];
+        state.offset += 1;
+        value = (value << 7) + (byteValue & 0x7f);
+    } while (byteValue & 0x80);
+    return value;
+}
+
+function midiEventDataLength(status) {
+    var eventType = status & 0xf0;
+    if (eventType === 0xc0 || eventType === 0xd0) return 1;
+    if (eventType >= 0x80 && eventType <= 0xe0) return 2;
+    if (status === 0xf1 || status === 0xf3) return 1;
+    if (status === 0xf2) return 2;
+    return 0;
+}
+
+function addPolyphonyEvent(polyphonyEvents, activeNotes, tick, channel, noteNumber, delta) {
+    var key = channel + ":" + noteNumber;
+    if (delta > 0) {
+        activeNotes[key] = (activeNotes[key] || 0) + 1;
+        polyphonyEvents.push({ tick: tick, delta: 1 });
+        return true;
+    }
+    if (!activeNotes[key]) return false;
+    activeNotes[key] -= 1;
+    polyphonyEvents.push({ tick: tick, delta: -1 });
+    return false;
+}
+
+function parseMidiTrack(bytes, start, end, summary) {
+    var state = { offset: start };
+    var runningStatus = null;
+    var tick = 0;
+    var activeNotes = {};
+
+    while (state.offset < end) {
+        tick += readVarLength(bytes, state, end);
+        if (state.offset >= end) break;
+
+        var status = bytes[state.offset];
+        var dataOffset;
+        if (status < 0x80) {
+            if (runningStatus === null) {
+                throw new Error("MIDI running status found before status byte");
+            }
+            status = runningStatus;
+            dataOffset = state.offset;
+        } else {
+            state.offset += 1;
+            dataOffset = state.offset;
+            if (status < 0xf0) {
+                runningStatus = status;
+            }
+        }
+
+        if (status === 0xff) {
+            var metaType = bytes[state.offset];
+            state.offset += 1;
+            var metaLength = readVarLength(bytes, state, end);
+            if (metaType === 0x51 && metaLength === 3) {
+                var microsecondsPerQuarter = (bytes[state.offset] << 16) + (bytes[state.offset + 1] << 8) + bytes[state.offset + 2];
+                summary.tempoEvents.push({
+                    tick: tick,
+                    bpm: Math.round(60000000 / microsecondsPerQuarter),
+                    microsecondsPerQuarter: microsecondsPerQuarter
+                });
+            }
+            state.offset += metaLength;
+            continue;
+        }
+
+        if (status === 0xf0 || status === 0xf7) {
+            var sysexLength = readVarLength(bytes, state, end);
+            state.offset += sysexLength;
+            continue;
+        }
+
+        var dataLength = midiEventDataLength(status);
+        state.offset = dataOffset + dataLength;
+
+        var eventType = status & 0xf0;
+        var channel = (status & 0x0f) + 1;
+        var firstDataByte = bytes[dataOffset];
+        var secondDataByte = dataLength > 1 ? bytes[dataOffset + 1] : 0;
+
+        if (eventType >= 0x80 && eventType <= 0xe0) {
+            summary.channels[channel] = true;
+        }
+
+        if (eventType === 0xc0) {
+            summary.programs[firstDataByte] = true;
+            summary.channelPrograms[channel + ":" + firstDataByte] = true;
+        } else if (eventType === 0x90 && secondDataByte > 0) {
+            summary.noteCount += 1;
+            summary.minPitch = Math.min(summary.minPitch, firstDataByte);
+            summary.maxPitch = Math.max(summary.maxPitch, firstDataByte);
+            addPolyphonyEvent(summary.polyphonyEvents, activeNotes, tick, channel, firstDataByte, 1);
+        } else if (eventType === 0x80 || (eventType === 0x90 && secondDataByte === 0)) {
+            addPolyphonyEvent(summary.polyphonyEvents, activeNotes, tick, channel, firstDataByte, -1);
+        }
+
+        summary.maxTick = Math.max(summary.maxTick, tick);
+    }
+}
+
+function durationSecondsFromTempoEvents(maxTick, division, tempoEvents) {
+    if (division <= 0 || (division & 0x8000)) return 0;
+    var sortedTempos = tempoEvents.slice().sort(function (a, b) {
+        return a.tick - b.tick;
+    });
+    var microsecondsPerQuarter = 500000;
+    var lastTick = 0;
+    var seconds = 0;
+
+    sortedTempos.forEach(function (tempo) {
+        var boundedTick = Math.min(tempo.tick, maxTick);
+        if (boundedTick > lastTick) {
+            seconds += (boundedTick - lastTick) * microsecondsPerQuarter / division / 1000000;
+            lastTick = boundedTick;
+        }
+        microsecondsPerQuarter = tempo.microsecondsPerQuarter;
+    });
+
+    if (maxTick > lastTick) {
+        seconds += (maxTick - lastTick) * microsecondsPerQuarter / division / 1000000;
+    }
+
+    return seconds;
+}
+
+function maxPolyphony(polyphonyEvents) {
+    var active = 0;
+    var maxActive = 0;
+    polyphonyEvents.sort(function (a, b) {
+        if (a.tick !== b.tick) return a.tick - b.tick;
+        return a.delta - b.delta;
+    }).forEach(function (event) {
+        active += event.delta;
+        maxActive = Math.max(maxActive, active);
+    });
+    return maxActive;
+}
+
+function objectKeyCount(object) {
+    return Object.keys(object).length;
+}
+
+function formatTempoLabel(tempoEvents) {
+    if (!tempoEvents.length) return "120 BPM";
+    var bpms = tempoEvents.map(function (tempo) {
+        return tempo.bpm;
+    });
+    var minBpm = Math.min.apply(null, bpms);
+    var maxBpm = Math.max.apply(null, bpms);
+    if (minBpm === maxBpm) return minBpm + " BPM";
+    return minBpm + "-" + maxBpm + " BPM";
+}
+
+function parseMidiAnalysis(bytes) {
+    if (bytesToText(bytes, 0, 4) !== "MThd") {
+        throw new Error("Invalid MIDI header");
+    }
+
+    var headerLength = readUint32(bytes, 4);
+    var declaredTrackCount = readUint16(bytes, 10);
+    var division = readUint16(bytes, 12);
+    var offset = 8 + headerLength;
+    var summary = {
+        trackCount: 0,
+        channels: {},
+        programs: {},
+        channelPrograms: {},
+        tempoEvents: [],
+        polyphonyEvents: [],
+        noteCount: 0,
+        minPitch: 128,
+        maxPitch: -1,
+        maxTick: 0
+    };
+
+    while (offset + 8 <= bytes.length) {
+        var chunkType = bytesToText(bytes, offset, 4);
+        var chunkLength = readUint32(bytes, offset + 4);
+        var chunkStart = offset + 8;
+        var chunkEnd = chunkStart + chunkLength;
+        if (chunkEnd > bytes.length) {
+            throw new Error("MIDI track chunk exceeds file length");
+        }
+        if (chunkType === "MTrk") {
+            summary.trackCount += 1;
+            parseMidiTrack(bytes, chunkStart, chunkEnd, summary);
+        }
+        offset = chunkEnd;
+    }
+
+    var programCount = objectKeyCount(summary.programs);
+    var channelProgramCount = objectKeyCount(summary.channelPrograms);
+    var channelCount = objectKeyCount(summary.channels);
+    var pitchRangeLabel = summary.noteCount
+        ? midiNoteName(summary.minPitch) + "-" + midiNoteName(summary.maxPitch)
+        : "--";
+
+    return {
+        durationSeconds: durationSecondsFromTempoEvents(summary.maxTick, division, summary.tempoEvents),
+        tempoLabel: formatTempoLabel(summary.tempoEvents),
+        trackCount: summary.trackCount || declaredTrackCount,
+        channelCount: channelCount,
+        programLabel: programCount
+            ? formatCount(programCount, "program", "programs") + " / " + formatCount(channelProgramCount, "mapping", "mappings")
+            : "Default piano",
+        noteCount: summary.noteCount,
+        pitchRangeLabel: pitchRangeLabel,
+        maxPolyphony: maxPolyphony(summary.polyphonyEvents)
+    };
+}
+
 function noteNameForOffset(offset) {
     var absoluteNote = controls.octave * 12 + offset;
     return noteNames[absoluteNote % 12] + Math.floor(absoluteNote / 12);
@@ -168,6 +477,7 @@ function downloadNameFromSongName(songName) {
 
 function loadMidiFile(url, start) {
     activeMidiUrl = url;
+    analyzeMidiUrl(url);
     MIDI.Player.stop();
     releaseKeyboardNotes();
     setPlaybackState(false);
