@@ -150,10 +150,15 @@
                     <button id="loop-button" class="icon-button toggle-button" type="button" aria-label="Loop" aria-pressed="false">Loop</button>
                     <button id="reset-view-button" class="icon-button" type="button" aria-label="Reset view">Reset view</button>
                 </div>
-                <div>
+                <div class="track-info">
                     <span class="track-title">Now playing</span>
                     <span id="active-song-title">Game Of Thrones Theme, Ramin Djawadi</span>
                     <span class="interaction-hint">Mouse/touch keys · Drag/wheel camera · Keyboard performance</span>
+                </div>
+                <div class="timeline-control" aria-label="Playback timeline">
+                    <span id="current-time" class="time-readout">0:00</span>
+                    <input id="timeline-slider" type="range" min="0" max="1000" step="1" value="0" disabled>
+                    <span id="duration-time" class="time-readout">--</span>
                 </div>
                 <div class="speed-control">
                     <div class="speed-label">

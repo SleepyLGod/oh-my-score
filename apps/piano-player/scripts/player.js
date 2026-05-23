@@ -39,6 +39,9 @@ var stopButton = document.getElementById("stop-button");
 var restartButton = document.getElementById("restart-button");
 var loopButton = document.getElementById("loop-button");
 var resetViewButton = document.getElementById("reset-view-button");
+var timelineSlider = document.getElementById("timeline-slider");
+var currentTimeReadout = document.getElementById("current-time");
+var durationTimeReadout = document.getElementById("duration-time");
 var lowerKeyRow = document.getElementById("lower-key-row");
 var middleKeyRow = document.getElementById("middle-key-row");
 var upperKeyRow = document.getElementById("upper-key-row");
@@ -57,6 +60,11 @@ var downloadCleanedMidiLink = document.getElementById("download-cleaned-midi-lin
 var loadCleanedMidiButton = document.getElementById("load-cleaned-midi-button");
 var cleanupStatus = document.getElementById("cleanup-status");
 var analysisRequestId = 0;
+var timelineDurationSeconds = 0;
+var isSeekingTimeline = false;
+var wasPlayingBeforeSeek = false;
+var playbackClockStartMs = 0;
+var playbackClockBaseSeconds = 0;
 var noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 var keyboardLayoutRows = [
     {
@@ -165,6 +173,46 @@ function formatDuration(seconds) {
     return minutes + ":" + String(remainingSeconds).padStart(2, "0");
 }
 
+function resetTimeline() {
+    timelineDurationSeconds = 0;
+    timelineSlider.value = "0";
+    timelineSlider.disabled = true;
+    currentTimeReadout.textContent = "0:00";
+    durationTimeReadout.textContent = "--";
+}
+
+function setTimelineDuration(seconds) {
+    timelineDurationSeconds = isFinite(seconds) && seconds > 0 ? seconds : 0;
+    timelineSlider.disabled = timelineDurationSeconds <= 0;
+    durationTimeReadout.textContent = formatDuration(timelineDurationSeconds);
+}
+
+function updateTimelinePosition(seconds) {
+    var boundedSeconds = Math.max(0, Math.min(seconds || 0, timelineDurationSeconds || seconds || 0));
+    currentTimeReadout.textContent = formatDuration(boundedSeconds);
+    if (!isSeekingTimeline && timelineDurationSeconds > 0) {
+        timelineSlider.value = String(Math.round(boundedSeconds / timelineDurationSeconds * 1000));
+    }
+}
+
+function currentTimelineSeekSeconds() {
+    if (!timelineDurationSeconds) return 0;
+    return parseInt(timelineSlider.value, 10) / 1000 * timelineDurationSeconds;
+}
+
+function currentPlaybackSeconds() {
+    if (!MIDI.Player.playing || playbackClockStartMs <= 0) {
+        return currentTimelineSeekSeconds();
+    }
+    return playbackClockBaseSeconds + (Date.now() - playbackClockStartMs) / 1000;
+}
+
+function syncPlayerSeekTime(seconds) {
+    var milliseconds = Math.max(0, seconds) * 1000;
+    MIDI.Player.currentTime = milliseconds;
+    MIDI.Player.restart = milliseconds;
+}
+
 function formatCount(count, singular, plural) {
     var label = count === 1 ? singular : plural;
     return count + " " + label;
@@ -185,6 +233,7 @@ function resetMidiAnalysis(message) {
     analysisPitchRange.textContent = "--";
     analysisPolyphony.textContent = "--";
     cleanMidiButton.disabled = true;
+    resetTimeline();
 }
 
 function updateMidiAnalysis(summary) {
@@ -198,13 +247,14 @@ function updateMidiAnalysis(summary) {
     analysisPitchRange.textContent = summary.pitchRangeLabel;
     analysisPolyphony.textContent = summary.maxPolyphony + " max";
     cleanMidiButton.disabled = !activeMidiBytes || !summary.noteCount;
+    setTimelineDuration(summary.durationSeconds);
 }
 
 function resetCleanedMidi(message) {
     if (cleanedMidiUrl) {
         URL.revokeObjectURL(cleanedMidiUrl);
     }
-    if (cleanedPlaybackUrl && cleanedPlaybackUrl !== activeMidiUrl) {
+    if (cleanedPlaybackUrl && cleanedPlaybackUrl !== activeMidiUrl && cleanedPlaybackUrl.indexOf("blob:") === 0) {
         URL.revokeObjectURL(cleanedPlaybackUrl);
         cleanedPlaybackUrl = null;
     }
@@ -235,6 +285,14 @@ function safeMidiDownloadName(name) {
         name += ".mid";
     }
     return name;
+}
+
+function midiBytesToDataUrl(bytes) {
+    var binary = "";
+    for (var i = 0; i < bytes.length; i += 1) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return "data:audio/midi;base64," + btoa(binary);
 }
 
 function setSourceMidiDownload(bytes, downloadName, title) {
@@ -613,13 +671,13 @@ function cleanActiveMidi() {
 function loadCleanedMidi() {
     if (!cleanedMidiBytes || !midiReady) return;
 
-    if (cleanedPlaybackUrl && cleanedPlaybackUrl !== activeMidiUrl) {
+    if (cleanedPlaybackUrl && cleanedPlaybackUrl !== activeMidiUrl && cleanedPlaybackUrl.indexOf("blob:") === 0) {
         URL.revokeObjectURL(cleanedPlaybackUrl);
     }
-    cleanedPlaybackUrl = URL.createObjectURL(new Blob([new Uint8Array(cleanedMidiBytes)], { type: "audio/midi" }));
+    cleanedPlaybackUrl = midiBytesToDataUrl(cleanedMidiBytes);
     activeSongTitle.textContent = (sourceMidiTitle || activeSongTitle.textContent || "Score") + " (Cleaned)";
     setUploadStatus("Cleaned MIDI loaded");
-    loadMidiFile(cleanedPlaybackUrl, true, { preserveCleaned: true });
+    loadMidiFile(cleanedPlaybackUrl, false, { preserveCleaned: true });
 }
 
 function objectKeyCount(object) {
@@ -729,10 +787,17 @@ function loadMidiFile(url, start, options) {
     activeMidiUrl = url;
     analyzeMidiUrl(url, options);
     MIDI.Player.stop();
+    syncPlayerSeekTime(0);
     releaseKeyboardNotes();
+    playbackClockStartMs = 0;
+    playbackClockBaseSeconds = 0;
     setPlaybackState(false);
+    updateTimelinePosition(0);
     MIDI.Player.timeWarp = 1 / controls.playbackSpeed;
     MIDI.Player.loadFile(url, function () {
+        syncPlayerSeekTime(0);
+        setTimelineDuration(MIDI.Player.endTime / 1000);
+        updateTimelinePosition(0);
         if (start) {
             startPlayback();
         }
@@ -764,12 +829,20 @@ function setPlaybackState(isPlaying) {
 
 function startPlayback() {
     if (!activeMidiUrl || !midiReady) return;
+    playbackClockBaseSeconds = currentTimelineSeekSeconds();
+    playbackClockStartMs = Date.now();
+    syncPlayerSeekTime(playbackClockBaseSeconds);
     MIDI.Player.resume();
     setPlaybackState(true);
 }
 
 function pausePlayback() {
+    var pausedSeconds = currentPlaybackSeconds();
+    syncPlayerSeekTime(pausedSeconds);
+    updateTimelinePosition(pausedSeconds);
     MIDI.Player.pause();
+    playbackClockStartMs = 0;
+    playbackClockBaseSeconds = pausedSeconds;
     setPlaybackState(false);
 }
 
@@ -784,12 +857,16 @@ function playPausePlayback() {
 function stopPlayback() {
     MIDI.Player.stop();
     releaseKeyboardNotes();
+    playbackClockStartMs = 0;
+    playbackClockBaseSeconds = 0;
     setPlaybackState(false);
+    updateTimelinePosition(0);
 }
 
 function restartPlayback() {
     if (!activeMidiUrl || !midiReady) return;
     loopRestartQueued = false;
+    updateTimelinePosition(0);
     loadMidiFile(activeMidiUrl, true, { preserveCleaned: activeMidiUrl === cleanedPlaybackUrl });
 }
 
@@ -797,6 +874,42 @@ function setLoopEnabled(enabled) {
     loopEnabled = enabled;
     loopButton.classList.toggle("is-active", loopEnabled);
     loopButton.setAttribute("aria-pressed", loopEnabled ? "true" : "false");
+}
+
+function beginTimelineSeek() {
+    if (timelineSlider.disabled) return;
+    isSeekingTimeline = true;
+    wasPlayingBeforeSeek = MIDI.Player.playing;
+    if (wasPlayingBeforeSeek) {
+        MIDI.Player.pause();
+    }
+}
+
+function previewTimelineSeek() {
+    if (timelineSlider.disabled) return;
+    updateTimelinePosition(currentTimelineSeekSeconds());
+}
+
+function commitTimelineSeek() {
+    if (timelineSlider.disabled) return;
+    var seekSeconds = currentTimelineSeekSeconds();
+    var shouldResumeAfterSeek = wasPlayingBeforeSeek || MIDI.Player.playing;
+
+    isSeekingTimeline = false;
+    loopRestartQueued = false;
+    releaseKeyboardNotes();
+    MIDI.Player.pause();
+    syncPlayerSeekTime(seekSeconds);
+    playbackClockStartMs = 0;
+    playbackClockBaseSeconds = seekSeconds;
+    updateTimelinePosition(seekSeconds);
+
+    if (shouldResumeAfterSeek) {
+        startPlayback();
+    } else {
+        setPlaybackState(false);
+    }
+    wasPlayingBeforeSeek = false;
 }
 
 function resetCameraView() {
@@ -807,11 +920,20 @@ function resetCameraView() {
 
 function setupPlaybackAnimation() {
     MIDI.Player.setAnimation({
-        interval: 250,
+        interval: 100,
         callback: function (data) {
-            if (!MIDI.Player.playing || !data.end) return;
+            if (!data.end) return;
 
-            var reachedEnd = data.now >= data.end;
+            if (!isSeekingTimeline) {
+                if (timelineDurationSeconds <= 0) {
+                    setTimelineDuration(data.end);
+                }
+                updateTimelinePosition(MIDI.Player.playing ? currentPlaybackSeconds() : data.now);
+            }
+
+            if (!MIDI.Player.playing) return;
+
+            var reachedEnd = currentPlaybackSeconds() >= data.end;
             if (!reachedEnd) {
                 loopRestartQueued = false;
                 return;
@@ -1362,6 +1484,10 @@ window.onload = function () {
     restartButton.onclick = restartPlayback;
     cleanMidiButton.onclick = cleanActiveMidi;
     loadCleanedMidiButton.onclick = loadCleanedMidi;
+    timelineSlider.onpointerdown = beginTimelineSeek;
+    timelineSlider.onkeydown = beginTimelineSeek;
+    timelineSlider.oninput = previewTimelineSeek;
+    timelineSlider.onchange = commitTimelineSeek;
     loopButton.onclick = function () {
         setLoopEnabled(!loopEnabled);
     };

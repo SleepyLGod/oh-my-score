@@ -167,6 +167,10 @@ Acceptance criteria:
 
 Goal: make score review efficient.
 
+Status: V1 done for current time, duration, progress display, and basic seek.
+Future polish can add loop ranges or bar/beat grid after the player state is
+more structured.
+
 Implementation scope:
 
 - Add timeline progress, current time, duration, and seek.
@@ -216,7 +220,6 @@ Acceptance criteria:
 ## Near-Term Recommended Order
 
 1. Add simple instrument presets.
-2. Add timeline and seek.
-3. Add async conversion jobs.
-4. Profile conversion time and evaluate ONNX session reuse.
-5. Revisit alternative transcription engines.
+2. Add async conversion jobs.
+3. Profile conversion time and evaluate ONNX session reuse.
+4. Revisit alternative transcription engines.

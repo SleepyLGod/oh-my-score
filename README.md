@@ -106,9 +106,9 @@ If conversion fails with a missing model error, confirm that
 - [x] Show keyboard mapping with note labels for the selected octave.
 - [x] Show Smart Score MIDI analysis for loaded and converted MIDI.
 - [x] Export source and conservatively cleaned MIDI variants.
+- [x] Add playback timeline and seek controls.
 - [x] Run frontend and backend CI on GitHub Actions.
 - [ ] Add progress tracking for long-running conversion jobs.
-- [ ] Add playback timeline and seek controls.
 - [ ] Profile conversion time and evaluate ONNX session reuse.
 - [ ] Research multi-instrument MIDI playback and visualization.
 
