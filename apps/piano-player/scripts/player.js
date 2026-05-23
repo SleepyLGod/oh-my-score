@@ -6,7 +6,11 @@ var activeMidiUrl = null;
 var convertedMidiUrl = null;
 var localMidiUrl = null;
 var cleanedMidiUrl = null;
+var cleanedPlaybackUrl = null;
 var activeMidiBytes = null;
+var cleanedMidiBytes = null;
+var sourceMidiDownloadUrl = null;
+var sourceMidiTitle = "";
 var midiReady = false;
 var loopEnabled = false;
 var loopRestartQueued = false;
@@ -47,8 +51,10 @@ var analysisPrograms = document.getElementById("analysis-programs");
 var analysisNotes = document.getElementById("analysis-notes");
 var analysisPitchRange = document.getElementById("analysis-pitch-range");
 var analysisPolyphony = document.getElementById("analysis-polyphony");
+var downloadSourceMidiLink = document.getElementById("download-source-midi-link");
 var cleanMidiButton = document.getElementById("clean-midi-button");
 var downloadCleanedMidiLink = document.getElementById("download-cleaned-midi-link");
+var loadCleanedMidiButton = document.getElementById("load-cleaned-midi-button");
 var cleanupStatus = document.getElementById("cleanup-status");
 var analysisRequestId = 0;
 var noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -198,24 +204,67 @@ function resetCleanedMidi(message) {
     if (cleanedMidiUrl) {
         URL.revokeObjectURL(cleanedMidiUrl);
     }
+    if (cleanedPlaybackUrl && cleanedPlaybackUrl !== activeMidiUrl) {
+        URL.revokeObjectURL(cleanedPlaybackUrl);
+        cleanedPlaybackUrl = null;
+    }
     cleanedMidiUrl = null;
+    cleanedMidiBytes = null;
     downloadCleanedMidiLink.hidden = true;
     downloadCleanedMidiLink.removeAttribute("href");
     downloadCleanedMidiLink.removeAttribute("download");
+    loadCleanedMidiButton.hidden = true;
     cleanupStatus.textContent = message || "Cleanup keeps the source MIDI unchanged.";
+}
+
+function resetSourceMidiDownload() {
+    if (sourceMidiDownloadUrl) {
+        URL.revokeObjectURL(sourceMidiDownloadUrl);
+    }
+    sourceMidiDownloadUrl = null;
+    sourceMidiTitle = "";
+    downloadSourceMidiLink.hidden = true;
+    downloadSourceMidiLink.removeAttribute("href");
+    downloadSourceMidiLink.removeAttribute("download");
+}
+
+function safeMidiDownloadName(name) {
+    name = name || "score.mid";
+    name = name.replace(/[\\/:*?"<>|\s]+/g, "_");
+    if (!/\.midi?$/i.test(name)) {
+        name += ".mid";
+    }
+    return name;
+}
+
+function setSourceMidiDownload(bytes, downloadName, title) {
+    resetSourceMidiDownload();
+    sourceMidiTitle = title || activeSongTitle.textContent || "score";
+    sourceMidiDownloadUrl = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "audio/midi" }));
+    downloadSourceMidiLink.href = sourceMidiDownloadUrl;
+    downloadSourceMidiLink.download = safeMidiDownloadName(downloadName || sourceMidiTitle);
+    downloadSourceMidiLink.hidden = false;
 }
 
 function cleanedDownloadName() {
     var name = activeSongTitle.textContent || "score";
+    name = name.replace(/\s+\(Cleaned\)$/, "");
     name = name.replace(/\.[^/.]+$/, "");
+    name = name.replace(/-cleaned$/i, "");
     name = name.replace(/[\\/:*?"<>|\s]+/g, "_");
     return (name || "score") + "-cleaned.mid";
 }
 
-function analyzeMidiUrl(url) {
+function analyzeMidiUrl(url, options) {
+    options = options || {};
     var requestId = ++analysisRequestId;
     activeMidiBytes = null;
-    resetCleanedMidi();
+    if (options.storeAsSource) {
+        resetSourceMidiDownload();
+    }
+    if (!options.preserveCleaned) {
+        resetCleanedMidi();
+    }
     resetMidiAnalysis("Analyzing MIDI...");
 
     fetch(url).then(function (response) {
@@ -226,10 +275,16 @@ function analyzeMidiUrl(url) {
     }).then(function (arrayBuffer) {
         if (requestId !== analysisRequestId) return;
         activeMidiBytes = new Uint8Array(arrayBuffer);
+        if (options.storeAsSource) {
+            setSourceMidiDownload(activeMidiBytes, options.sourceDownloadName, options.sourceTitle);
+        }
         updateMidiAnalysis(parseMidiAnalysis(activeMidiBytes));
     }).catch(function (error) {
         if (requestId !== analysisRequestId) return;
         activeMidiBytes = null;
+        if (options.storeAsSource) {
+            resetSourceMidiDownload();
+        }
         console.warn(error);
         resetMidiAnalysis("MIDI analysis unavailable. Playback may still work.");
     });
@@ -539,10 +594,12 @@ function cleanActiveMidi() {
     try {
         var cleaned = cleanMidiBytes(activeMidiBytes);
         resetCleanedMidi();
+        cleanedMidiBytes = new Uint8Array(cleaned.bytes);
         cleanedMidiUrl = URL.createObjectURL(new Blob([cleaned.bytes], { type: "audio/midi" }));
         downloadCleanedMidiLink.href = cleanedMidiUrl;
         downloadCleanedMidiLink.download = cleanedDownloadName();
         downloadCleanedMidiLink.hidden = false;
+        loadCleanedMidiButton.hidden = false;
         cleanupStatus.textContent = "Cleaned " + formatCount(cleaned.stats.notesSeen, "note", "notes")
             + ": " + cleaned.stats.duplicateOverlapsRemoved + " overlaps, "
             + cleaned.stats.shortNotesRemoved + " short notes, "
@@ -551,6 +608,18 @@ function cleanActiveMidi() {
         console.warn(error);
         resetCleanedMidi("Cleanup unavailable for this MIDI file.");
     }
+}
+
+function loadCleanedMidi() {
+    if (!cleanedMidiBytes || !midiReady) return;
+
+    if (cleanedPlaybackUrl && cleanedPlaybackUrl !== activeMidiUrl) {
+        URL.revokeObjectURL(cleanedPlaybackUrl);
+    }
+    cleanedPlaybackUrl = URL.createObjectURL(new Blob([new Uint8Array(cleanedMidiBytes)], { type: "audio/midi" }));
+    activeSongTitle.textContent = (sourceMidiTitle || activeSongTitle.textContent || "Score") + " (Cleaned)";
+    setUploadStatus("Cleaned MIDI loaded");
+    loadMidiFile(cleanedPlaybackUrl, true, { preserveCleaned: true });
 }
 
 function objectKeyCount(object) {
@@ -656,9 +725,9 @@ function downloadNameFromSongName(songName) {
     return songName + ".mid";
 }
 
-function loadMidiFile(url, start) {
+function loadMidiFile(url, start, options) {
     activeMidiUrl = url;
-    analyzeMidiUrl(url);
+    analyzeMidiUrl(url, options);
     MIDI.Player.stop();
     releaseKeyboardNotes();
     setPlaybackState(false);
@@ -670,17 +739,21 @@ function loadMidiFile(url, start) {
     });
 }
 
-function loadConvertedMidi(blob) {
+function loadConvertedMidi(blob, downloadName, title) {
     if (convertedMidiUrl) {
         URL.revokeObjectURL(convertedMidiUrl);
     }
     convertedMidiUrl = URL.createObjectURL(blob);
-    loadMidiFile(convertedMidiUrl, true);
+    loadMidiFile(convertedMidiUrl, true, {
+        storeAsSource: true,
+        sourceDownloadName: downloadName,
+        sourceTitle: title
+    });
 }
 
 function reloadActiveMidi() {
     if (activeMidiUrl) {
-        loadMidiFile(activeMidiUrl, true);
+        loadMidiFile(activeMidiUrl, true, { preserveCleaned: activeMidiUrl === cleanedPlaybackUrl });
     }
 }
 
@@ -717,7 +790,7 @@ function stopPlayback() {
 function restartPlayback() {
     if (!activeMidiUrl || !midiReady) return;
     loopRestartQueued = false;
-    loadMidiFile(activeMidiUrl, true);
+    loadMidiFile(activeMidiUrl, true, { preserveCleaned: activeMidiUrl === cleanedPlaybackUrl });
 }
 
 function setLoopEnabled(enabled) {
@@ -786,7 +859,11 @@ midiFileInput.onchange = function () {
     hideConversionResult();
     setUploadStatus("Local MIDI loaded");
     activeSongTitle.textContent = songNameFromFile(file);
-    loadMidiFile(localMidiUrl, true);
+    loadMidiFile(localMidiUrl, true, {
+        storeAsSource: true,
+        sourceDownloadName: file.name,
+        sourceTitle: songNameFromFile(file)
+    });
 };
 
 retryConvertButton.onclick = function () {
@@ -821,8 +898,8 @@ convertButton.onclick = function () {
         }
         return response.blob();
     }).then(function (blob) {
-        loadConvertedMidi(blob);
         var downloadName = downloadNameFromSongName(songName);
+        loadConvertedMidi(blob, downloadName, songName);
         setUploadStatus("Converted and loaded");
         showConversionResult(downloadName, blob);
         activeSongTitle.textContent = songName;
@@ -1273,13 +1350,18 @@ window.onload = function () {
         controls.song = songSelect.value;
         activeSongTitle.textContent = songTitleFromFile(controls.song);
         if (midiReady) {
-            loadMidiFile("./vendor/MIDI/midi/" + controls.song, true);
+            loadMidiFile("./vendor/MIDI/midi/" + controls.song, true, {
+                storeAsSource: true,
+                sourceDownloadName: controls.song,
+                sourceTitle: songTitleFromFile(controls.song)
+            });
         }
     };
     playButton.onclick = controls.play;
     stopButton.onclick = controls.stop;
     restartButton.onclick = restartPlayback;
     cleanMidiButton.onclick = cleanActiveMidi;
+    loadCleanedMidiButton.onclick = loadCleanedMidi;
     loopButton.onclick = function () {
         setLoopEnabled(!loopEnabled);
     };
@@ -1304,7 +1386,12 @@ window.onload = function () {
         midiReady = true;
         setMidiStatus("Ready", "status-ready");
         updateUploadButton();
-        loadMidiFile("./vendor/MIDI/midi/" + controls.song);
+        activeSongTitle.textContent = songTitleFromFile(controls.song);
+        loadMidiFile("./vendor/MIDI/midi/" + controls.song, false, {
+            storeAsSource: true,
+            sourceDownloadName: controls.song,
+            sourceTitle: songTitleFromFile(controls.song)
+        });
     
         MIDI.Player.addListener(function (data) {
             var pianoKey = data.note - MIDI.pianoKeyOffset - 3;

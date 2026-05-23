@@ -104,6 +104,8 @@ If conversion fails with a missing model error, confirm that
 - [x] Animate piano keys during MIDI playback.
 - [x] Support interactive mouse, touch, and keyboard performance input.
 - [x] Show keyboard mapping with note labels for the selected octave.
+- [x] Show Smart Score MIDI analysis for loaded and converted MIDI.
+- [x] Export source and conservatively cleaned MIDI variants.
 - [x] Run frontend and backend CI on GitHub Actions.
 - [ ] Add progress tracking for long-running conversion jobs.
 - [ ] Add playback timeline and seek controls.

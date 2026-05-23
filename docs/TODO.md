@@ -106,6 +106,8 @@ analysis UI and cleanup/export logic.
 
 Goal: show users what the loaded MIDI contains.
 
+Status: done for the first read-only version.
+
 Implementation scope:
 
 - Parse loaded MIDI into a normalized analysis summary.
@@ -124,12 +126,17 @@ Acceptance criteria:
 
 Goal: export a cleaner MIDI variant while preserving the original.
 
+Status: V1 done for conservative duplicate-overlap removal, very short note
+filtering, velocity normalization, source export, cleaned export, and cleaned
+reload. Quantization and stricter user-configurable cleanup remain future work.
+
 Implementation scope:
 
-- Add cleanup options for quantization, very short note filtering, duplicate note
-  merging, and velocity normalization.
-- Keep defaults conservative.
-- Export both original MIDI and cleaned MIDI from the UI.
+- Keep the current V1 cleanup defaults conservative.
+- Add future user-facing options for stricter short-note filtering and duplicate
+  note merging only after the exported MIDI path is stable.
+- Treat quantization as a separate future feature because it needs careful
+  tempo, division, and grid handling.
 
 Acceptance criteria:
 
@@ -208,11 +215,8 @@ Acceptance criteria:
 
 ## Near-Term Recommended Order
 
-1. Implement Smart MIDI Analysis.
-2. Implement conservative Smart MIDI Cleanup.
-3. Add original vs cleaned MIDI export.
-4. Add simple instrument presets.
-5. Add timeline and seek.
-6. Add async conversion jobs.
-7. Revisit alternative transcription engines.
-
+1. Add simple instrument presets.
+2. Add timeline and seek.
+3. Add async conversion jobs.
+4. Profile conversion time and evaluate ONNX session reuse.
+5. Revisit alternative transcription engines.
