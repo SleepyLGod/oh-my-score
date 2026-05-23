@@ -110,6 +110,8 @@ If conversion fails with a missing model error, confirm that
 - [ ] Profile conversion time and evaluate ONNX session reuse.
 - [ ] Research multi-instrument MIDI playback and visualization.
 
+See [`docs/TODO.md`](./docs/TODO.md) for the detailed Smart Score roadmap.
+
 ## Tech Stack
 
 - Three.js
