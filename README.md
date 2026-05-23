@@ -113,6 +113,8 @@ If conversion fails with a missing model error, confirm that
 - [ ] Research multi-instrument MIDI playback and visualization.
 
 See [`docs/TODO.md`](./docs/TODO.md) for the detailed Smart Score roadmap.
+See [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) for the local verification
+and pre-commit review checklist.
 
 ## Tech Stack
 

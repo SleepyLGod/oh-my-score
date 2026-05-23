@@ -7,14 +7,14 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot</artifactId>
-            <version>3.3.11</version>
+            <version>3.5.14</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.11</version>
+        <version>3.5.14</version>
     </parent>
     <groupId>moe.eveelseif</groupId>
     <artifactId>pianotranscription</artifactId>
