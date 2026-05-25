@@ -106,6 +106,7 @@ If conversion fails with a missing model error, confirm that
 - [x] Show keyboard mapping with note labels for the selected octave.
 - [x] Show Smart Score MIDI analysis for loaded and converted MIDI.
 - [x] Export source and conservatively cleaned MIDI variants.
+- [x] Export simple instrument preset MIDI variants.
 - [x] Add playback timeline and seek controls.
 - [x] Run frontend and backend CI on GitHub Actions.
 - [ ] Add progress tracking for long-running conversion jobs.

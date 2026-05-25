@@ -414,26 +414,36 @@ kbd small {
     overflow-wrap: anywhere;
 }
 .export-actions,
-.cleanup-actions {
+.cleanup-actions,
+.preset-actions {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
     gap: 8px;
     margin-top: 12px;
 }
 .export-actions .secondary-button[hidden],
-.cleanup-actions .secondary-button[hidden] {
+.cleanup-actions .secondary-button[hidden],
+.preset-actions .secondary-button[hidden] {
     display: none;
 }
 .export-actions .secondary-button,
-.cleanup-actions .secondary-button {
+.cleanup-actions .secondary-button,
+.preset-actions .secondary-button {
     min-width: 0;
 }
-.cleanup-actions .secondary-button:disabled {
+.cleanup-actions .secondary-button:disabled,
+.preset-actions .secondary-button:disabled {
     cursor: default;
     opacity: 0.42;
     transform: none;
 }
-#cleanup-status {
+.preset-field {
+    display: grid;
+    gap: 7px;
+    margin-top: 14px;
+}
+#cleanup-status,
+#preset-status {
     margin: 9px 0 0;
     color: var(--muted);
     font-size: 11px;

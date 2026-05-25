@@ -7,10 +7,14 @@ var convertedMidiUrl = null;
 var localMidiUrl = null;
 var cleanedMidiUrl = null;
 var cleanedPlaybackUrl = null;
+var presetMidiUrl = null;
+var presetPlaybackUrl = null;
 var activeMidiBytes = null;
 var cleanedMidiBytes = null;
+var presetMidiBytes = null;
 var sourceMidiDownloadUrl = null;
 var sourceMidiTitle = "";
+var presetCreatedLabel = "";
 var midiReady = false;
 var loopEnabled = false;
 var loopRestartQueued = false;
@@ -59,6 +63,11 @@ var cleanMidiButton = document.getElementById("clean-midi-button");
 var downloadCleanedMidiLink = document.getElementById("download-cleaned-midi-link");
 var loadCleanedMidiButton = document.getElementById("load-cleaned-midi-button");
 var cleanupStatus = document.getElementById("cleanup-status");
+var arrangementPresetSelect = document.getElementById("arrangement-preset");
+var createPresetMidiButton = document.getElementById("create-preset-midi-button");
+var downloadPresetMidiLink = document.getElementById("download-preset-midi-link");
+var loadPresetMidiButton = document.getElementById("load-preset-midi-button");
+var presetStatus = document.getElementById("preset-status");
 var analysisRequestId = 0;
 var timelineDurationSeconds = 0;
 var isSeekingTimeline = false;
@@ -66,6 +75,11 @@ var wasPlayingBeforeSeek = false;
 var playbackClockStartMs = 0;
 var playbackClockBaseSeconds = 0;
 var noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+var arrangementPresets = {
+    piano: { label: "Piano", program: 0 },
+    strings: { label: "Strings", program: 48 },
+    "soft-synth": { label: "Soft Synth", program: 88 }
+};
 var keyboardLayoutRows = [
     {
         element: lowerKeyRow,
@@ -233,6 +247,7 @@ function resetMidiAnalysis(message) {
     analysisPitchRange.textContent = "--";
     analysisPolyphony.textContent = "--";
     cleanMidiButton.disabled = true;
+    createPresetMidiButton.disabled = true;
     resetTimeline();
 }
 
@@ -247,6 +262,7 @@ function updateMidiAnalysis(summary) {
     analysisPitchRange.textContent = summary.pitchRangeLabel;
     analysisPolyphony.textContent = summary.maxPolyphony + " max";
     cleanMidiButton.disabled = !activeMidiBytes || !summary.noteCount;
+    createPresetMidiButton.disabled = !activeMidiBytes || !summary.noteCount;
     setTimelineDuration(summary.durationSeconds);
 }
 
@@ -265,6 +281,24 @@ function resetCleanedMidi(message) {
     downloadCleanedMidiLink.removeAttribute("download");
     loadCleanedMidiButton.hidden = true;
     cleanupStatus.textContent = message || "Cleanup keeps the source MIDI unchanged.";
+}
+
+function resetPresetMidi(message) {
+    if (presetMidiUrl) {
+        URL.revokeObjectURL(presetMidiUrl);
+    }
+    if (presetPlaybackUrl && presetPlaybackUrl !== activeMidiUrl && presetPlaybackUrl.indexOf("blob:") === 0) {
+        URL.revokeObjectURL(presetPlaybackUrl);
+        presetPlaybackUrl = null;
+    }
+    presetMidiUrl = null;
+    presetMidiBytes = null;
+    presetCreatedLabel = "";
+    downloadPresetMidiLink.hidden = true;
+    downloadPresetMidiLink.removeAttribute("href");
+    downloadPresetMidiLink.removeAttribute("download");
+    loadPresetMidiButton.hidden = true;
+    presetStatus.textContent = message || "Presets create arrangement sketches without changing the source MIDI.";
 }
 
 function resetSourceMidiDownload() {
@@ -313,6 +347,18 @@ function cleanedDownloadName() {
     return (name || "score") + "-cleaned.mid";
 }
 
+function baseMidiFileName(suffix) {
+    var name = activeSongTitle.textContent || sourceMidiTitle || "score";
+    name = name.replace(/\s+\((Cleaned|Preset: [^)]+)\)$/, "");
+    name = name.replace(/\.[^/.]+$/, "");
+    name = name.replace(/[\\/:*?"<>|\s]+/g, "_");
+    return (name || "score") + suffix + ".mid";
+}
+
+function presetDownloadName(preset) {
+    return baseMidiFileName("-" + preset.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""));
+}
+
 function analyzeMidiUrl(url, options) {
     options = options || {};
     var requestId = ++analysisRequestId;
@@ -322,6 +368,9 @@ function analyzeMidiUrl(url, options) {
     }
     if (!options.preserveCleaned) {
         resetCleanedMidi();
+    }
+    if (!options.preservePreset) {
+        resetPresetMidi();
     }
     resetMidiAnalysis("Analyzing MIDI...");
 
@@ -356,12 +405,25 @@ function readUint32(bytes, offset) {
     return ((bytes[offset] << 24) >>> 0) + (bytes[offset + 1] << 16) + (bytes[offset + 2] << 8) + bytes[offset + 3];
 }
 
+function appendUint32(bytes, value) {
+    bytes.push((value >>> 24) & 0xff);
+    bytes.push((value >>> 16) & 0xff);
+    bytes.push((value >>> 8) & 0xff);
+    bytes.push(value & 0xff);
+}
+
 function bytesToText(bytes, offset, length) {
     var text = "";
     for (var i = 0; i < length; i += 1) {
         text += String.fromCharCode(bytes[offset + i]);
     }
     return text;
+}
+
+function pushBytes(target, bytes, start, end) {
+    for (var i = start; i < end; i += 1) {
+        target.push(bytes[i]);
+    }
 }
 
 function readVarLength(bytes, state, limit) {
@@ -646,6 +708,166 @@ function cleanMidiBytes(sourceBytes) {
     };
 }
 
+function collectPresetTrackInfo(bytes, start, end) {
+    var state = { offset: start };
+    var runningStatus = null;
+    var info = {
+        noteChannels: {},
+        programChannels: {}
+    };
+
+    while (state.offset < end) {
+        readVarLength(bytes, state, end);
+        if (state.offset >= end) break;
+
+        var status = bytes[state.offset];
+        var dataOffset;
+        if (status < 0x80) {
+            if (runningStatus === null) {
+                throw new Error("MIDI running status found before status byte");
+            }
+            status = runningStatus;
+            dataOffset = state.offset;
+        } else {
+            state.offset += 1;
+            dataOffset = state.offset;
+            if (status < 0xf0) {
+                runningStatus = status;
+            }
+        }
+
+        if (status === 0xff) {
+            state.offset += 1;
+            var metaLength = readVarLength(bytes, state, end);
+            state.offset += metaLength;
+            continue;
+        }
+
+        if (status === 0xf0 || status === 0xf7) {
+            var sysexLength = readVarLength(bytes, state, end);
+            state.offset += sysexLength;
+            continue;
+        }
+
+        var dataLength = midiEventDataLength(status);
+        state.offset = dataOffset + dataLength;
+
+        var eventType = status & 0xf0;
+        var channel = (status & 0x0f) + 1;
+        if (eventType === 0xc0) {
+            info.programChannels[channel] = true;
+        } else if (eventType === 0x90 && bytes[dataOffset + 1] > 0) {
+            info.noteChannels[channel] = true;
+        }
+    }
+
+    return info;
+}
+
+function presetTrackBytes(sourceBytes, start, end, presetProgram, stats) {
+    var info = collectPresetTrackInfo(sourceBytes, start, end);
+    var trackBytes = new Uint8Array(sourceBytes.slice(start, end));
+    var state = { offset: 0 };
+    var runningStatus = null;
+    var insertedBytes = [];
+    var noteChannels = Object.keys(info.noteChannels).map(Number).sort(function (a, b) {
+        return a - b;
+    });
+
+    noteChannels.forEach(function (channel) {
+        if (channel === 10 || info.programChannels[channel]) return;
+        insertedBytes.push(0x00, 0xc0 + channel - 1, presetProgram);
+        stats.programChangesInserted += 1;
+    });
+
+    while (state.offset < trackBytes.length) {
+        readVarLength(trackBytes, state, trackBytes.length);
+        if (state.offset >= trackBytes.length) break;
+
+        var status = trackBytes[state.offset];
+        var dataOffset;
+        if (status < 0x80) {
+            if (runningStatus === null) {
+                throw new Error("MIDI running status found before status byte");
+            }
+            status = runningStatus;
+            dataOffset = state.offset;
+        } else {
+            state.offset += 1;
+            dataOffset = state.offset;
+            if (status < 0xf0) {
+                runningStatus = status;
+            }
+        }
+
+        if (status === 0xff) {
+            state.offset += 1;
+            var metaLength = readVarLength(trackBytes, state, trackBytes.length);
+            state.offset += metaLength;
+            continue;
+        }
+
+        if (status === 0xf0 || status === 0xf7) {
+            var sysexLength = readVarLength(trackBytes, state, trackBytes.length);
+            state.offset += sysexLength;
+            continue;
+        }
+
+        var dataLength = midiEventDataLength(status);
+        state.offset = dataOffset + dataLength;
+
+        if ((status & 0xf0) === 0xc0 && (status & 0x0f) !== 9 && trackBytes[dataOffset] !== presetProgram) {
+            trackBytes[dataOffset] = presetProgram;
+            stats.programChangesRewritten += 1;
+        }
+    }
+
+    var output = insertedBytes.slice();
+    pushBytes(output, trackBytes, 0, trackBytes.length);
+    return output;
+}
+
+function createPresetMidiBytes(sourceBytes, presetProgram) {
+    if (bytesToText(sourceBytes, 0, 4) !== "MThd") {
+        throw new Error("Invalid MIDI header");
+    }
+
+    var headerLength = readUint32(sourceBytes, 4);
+    var offset = 8 + headerLength;
+    var output = [];
+    var stats = {
+        programChangesInserted: 0,
+        programChangesRewritten: 0
+    };
+    pushBytes(output, sourceBytes, 0, offset);
+
+    while (offset + 8 <= sourceBytes.length) {
+        var chunkType = bytesToText(sourceBytes, offset, 4);
+        var chunkLength = readUint32(sourceBytes, offset + 4);
+        var chunkStart = offset + 8;
+        var chunkEnd = chunkStart + chunkLength;
+        if (chunkEnd > sourceBytes.length) {
+            throw new Error("MIDI track chunk exceeds file length");
+        }
+
+        pushBytes(output, sourceBytes, offset, offset + 4);
+        if (chunkType === "MTrk") {
+            var trackBytes = presetTrackBytes(sourceBytes, chunkStart, chunkEnd, presetProgram, stats);
+            appendUint32(output, trackBytes.length);
+            pushBytes(output, trackBytes, 0, trackBytes.length);
+        } else {
+            appendUint32(output, chunkLength);
+            pushBytes(output, sourceBytes, chunkStart, chunkEnd);
+        }
+        offset = chunkEnd;
+    }
+
+    return {
+        bytes: new Uint8Array(output),
+        stats: stats
+    };
+}
+
 function cleanActiveMidi() {
     if (!activeMidiBytes) return;
 
@@ -666,6 +888,43 @@ function cleanActiveMidi() {
         console.warn(error);
         resetCleanedMidi("Cleanup unavailable for this MIDI file.");
     }
+}
+
+function createPresetMidi() {
+    if (!activeMidiBytes) return;
+
+    var preset = arrangementPresets[arrangementPresetSelect.value] || arrangementPresets.piano;
+    try {
+        var presetResult = createPresetMidiBytes(activeMidiBytes, preset.program);
+        resetPresetMidi();
+        presetMidiBytes = new Uint8Array(presetResult.bytes);
+        presetCreatedLabel = preset.label;
+        presetMidiUrl = URL.createObjectURL(new Blob([presetResult.bytes], { type: "audio/midi" }));
+        downloadPresetMidiLink.href = presetMidiUrl;
+        downloadPresetMidiLink.download = presetDownloadName(preset);
+        downloadPresetMidiLink.hidden = false;
+        loadPresetMidiButton.hidden = false;
+        presetStatus.textContent = preset.label + " preset ready: "
+            + presetResult.stats.programChangesInserted + " inserted, "
+            + presetResult.stats.programChangesRewritten + " rewritten.";
+    } catch (error) {
+        console.warn(error);
+        resetPresetMidi("Preset unavailable for this MIDI file.");
+    }
+}
+
+function loadPresetMidi() {
+    if (!presetMidiBytes || !midiReady) return;
+
+    var preset = arrangementPresets[arrangementPresetSelect.value] || arrangementPresets.piano;
+    var presetLabel = presetCreatedLabel || preset.label;
+    if (presetPlaybackUrl && presetPlaybackUrl !== activeMidiUrl && presetPlaybackUrl.indexOf("blob:") === 0) {
+        URL.revokeObjectURL(presetPlaybackUrl);
+    }
+    presetPlaybackUrl = midiBytesToDataUrl(presetMidiBytes);
+    activeSongTitle.textContent = (sourceMidiTitle || activeSongTitle.textContent || "Score") + " (Preset: " + presetLabel + ")";
+    setUploadStatus(presetLabel + " preset loaded");
+    loadMidiFile(presetPlaybackUrl, false, { preserveCleaned: true, preservePreset: true });
 }
 
 function loadCleanedMidi() {
@@ -1484,6 +1743,8 @@ window.onload = function () {
     restartButton.onclick = restartPlayback;
     cleanMidiButton.onclick = cleanActiveMidi;
     loadCleanedMidiButton.onclick = loadCleanedMidi;
+    createPresetMidiButton.onclick = createPresetMidi;
+    loadPresetMidiButton.onclick = loadPresetMidi;
     timelineSlider.onpointerdown = beginTimelineSeek;
     timelineSlider.onkeydown = beginTimelineSeek;
     timelineSlider.oninput = previewTimelineSeek;

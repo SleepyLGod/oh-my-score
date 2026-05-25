@@ -139,6 +139,20 @@
                         <button id="load-cleaned-midi-button" class="secondary-button" type="button" hidden>Load Cleaned MIDI</button>
                     </div>
                     <p id="cleanup-status">Cleanup keeps the source MIDI unchanged.</p>
+                    <div class="preset-field">
+                        <label class="field-label" for="arrangement-preset">Arrangement preset</label>
+                        <select id="arrangement-preset">
+                            <option value="piano">Piano</option>
+                            <option value="strings">Strings</option>
+                            <option value="soft-synth">Soft Synth</option>
+                        </select>
+                    </div>
+                    <div class="preset-actions">
+                        <button id="create-preset-midi-button" class="secondary-button" type="button" disabled>Create Preset MIDI</button>
+                        <a id="download-preset-midi-link" class="secondary-button" href="#" download hidden>Download Preset MIDI</a>
+                        <button id="load-preset-midi-button" class="secondary-button" type="button" hidden>Load Preset MIDI</button>
+                    </div>
+                    <p id="preset-status">Presets create arrangement sketches without changing the source MIDI.</p>
                 </details>
             </aside>
 

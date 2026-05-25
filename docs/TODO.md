@@ -149,11 +149,17 @@ Acceptance criteria:
 
 Goal: provide lightweight MIDI arrangement variants.
 
+Status: V1 done for Piano, Strings, and Soft Synth program presets. Bass +
+Melody Split remains future work because it needs deliberate channel and note
+event rewriting.
+
 Implementation scope:
 
-- Add presets such as Piano, Strings, Bass + Melody Split, and Soft Synth.
-- Implement presets with MIDI channel/program changes and simple pitch-range or
-  melody/bass splitting.
+- Keep the current Piano, Strings, and Soft Synth presets as simple General MIDI
+  program variants.
+- Implement V1 presets with MIDI program changes only.
+- Keep pitch-range or melody/bass splitting as a later preset after channel
+  rewriting is explicitly designed.
 - Label the feature as presets or arrangement sketches, not full orchestration.
 
 Acceptance criteria:
@@ -219,7 +225,7 @@ Acceptance criteria:
 
 ## Near-Term Recommended Order
 
-1. Add simple instrument presets.
-2. Add async conversion jobs.
-3. Profile conversion time and evaluate ONNX session reuse.
+1. Add async conversion jobs.
+2. Profile conversion time and evaluate ONNX session reuse.
+3. Add Bass + Melody Split after MIDI channel rewriting is explicit.
 4. Revisit alternative transcription engines.
