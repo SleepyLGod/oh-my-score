@@ -7,6 +7,7 @@ import com.pianotranscriptioncli.service.TranscriptionService;
 import com.pianotranscriptioncli.utils.Utils;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import libpianotranscription.Transcriptor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,6 +38,7 @@ public class TranscriptionServiceImpl implements TranscriptionService {
     private String modelPath;
 
     private final ConcurrentHashMap<String, TranscriptionJob> jobs = new ConcurrentHashMap<>();
+    private final Object transcriptorLock = new Object();
     private final ExecutorService conversionExecutor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "omg-transcription-worker");
         return thread;
@@ -46,6 +48,8 @@ public class TranscriptionServiceImpl implements TranscriptionService {
         thread.setDaemon(true);
         return thread;
     });
+    private Transcriptor sharedTranscriptor;
+    private Path sharedTranscriptorModelPath;
 
     @PostConstruct
     public void startCleanup() {
@@ -196,6 +200,7 @@ public class TranscriptionServiceImpl implements TranscriptionService {
             conversionExecutor.shutdownNow();
             Thread.currentThread().interrupt();
         }
+        closeSharedTranscriptor();
     }
 
     private void runConversionJob(TranscriptionJob job, Path tmpDir) {
@@ -220,12 +225,49 @@ public class TranscriptionServiceImpl implements TranscriptionService {
             throw new FileNotFoundException("ONNX model not found: " + model);
         }
 
-        Utils.ConversionResult result = Utils.convertAudioToMidiWithTiming(inputFile, outputFile, model, tmpDir);
+        Utils.ConversionResult result = convertWithSharedTranscriptor(inputFile, outputFile, model, tmpDir);
         if (result.getOutputPath() == null) {
             throw new IOException("Audio conversion failed.");
         }
         System.out.println(result.getTiming().toLogLine(uploadStoreMs, inputFile, outputFile));
         return result;
+    }
+
+    private Utils.ConversionResult convertWithSharedTranscriptor(Path inputFile, Path outputFile, Path model,
+                                                                 Path tmpDir) throws Exception {
+        synchronized (transcriptorLock) {
+            long sessionCreateMs = ensureSharedTranscriptor(model);
+            return Utils.convertAudioToMidiWithTiming(inputFile, outputFile, sharedTranscriptor, sessionCreateMs, tmpDir);
+        }
+    }
+
+    private long ensureSharedTranscriptor(Path model) throws Exception {
+        Path normalizedModel = model.toAbsolutePath().normalize();
+        if (sharedTranscriptor != null && normalizedModel.equals(sharedTranscriptorModelPath)) {
+            return 0;
+        }
+
+        closeSharedTranscriptor();
+        long sessionStart = System.nanoTime();
+        sharedTranscriptor = new Transcriptor(normalizedModel.toString());
+        sharedTranscriptorModelPath = normalizedModel;
+        return elapsedMs(sessionStart);
+    }
+
+    private void closeSharedTranscriptor() {
+        synchronized (transcriptorLock) {
+            if (sharedTranscriptor == null) {
+                return;
+            }
+            try {
+                sharedTranscriptor.close();
+            } catch (Exception exception) {
+                System.err.println("Failed to close shared transcriptor: " + exception.getMessage());
+            } finally {
+                sharedTranscriptor = null;
+                sharedTranscriptorModelPath = null;
+            }
+        }
     }
 
     private TranscriptionJobResponse toResponse(TranscriptionJob job) {

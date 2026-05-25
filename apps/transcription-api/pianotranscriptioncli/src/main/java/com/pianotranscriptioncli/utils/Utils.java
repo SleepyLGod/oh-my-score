@@ -102,6 +102,14 @@ public class Utils {
     }
 
     public static ConversionResult convertAudioToMidiWithTiming(Path inputFile, Path outputFile, Path modelPath, Path workDir) throws Exception {
+        long sessionStart = System.nanoTime();
+        try (Transcriptor transcriptor = new Transcriptor(modelPath.toString())) {
+            return convertAudioToMidiWithTiming(inputFile, outputFile, transcriptor, elapsedMs(sessionStart), workDir);
+        }
+    }
+
+    public static ConversionResult convertAudioToMidiWithTiming(Path inputFile, Path outputFile, Transcriptor transcriptor,
+                                                               long sessionCreateMs, Path workDir) throws Exception {
         long totalStart = System.nanoTime();
         Files.createDirectories(workDir);
         Path pcmPath = Files.createTempFile(workDir, "omg-transcription-", ".pcm");
@@ -114,10 +122,6 @@ public class Utils {
             byte[] pcmBytes = Files.readAllBytes(pcmPath);
             float[] pcmData = Utils.normalizeShort(Utils.toShortLE(pcmBytes));
             long pcmReadNormalizeMs = elapsedMs(pcmStart);
-
-            long sessionStart = System.nanoTime();
-            Transcriptor transcriptor = new Transcriptor(modelPath.toString());
-            long sessionCreateMs = elapsedMs(sessionStart);
 
             long transcriptionStart = System.nanoTime();
             byte[] midiBytes = transcriptor.transcript(pcmData);
@@ -135,7 +139,7 @@ public class Utils {
                     pcmReadNormalizeMs,
                     sessionCreateMs,
                     transcriptionMs,
-                    elapsedMs(totalStart));
+                    sessionCreateMs + elapsedMs(totalStart));
             return new ConversionResult(outputFile, timing);
         } finally {
             Files.deleteIfExists(pcmPath);

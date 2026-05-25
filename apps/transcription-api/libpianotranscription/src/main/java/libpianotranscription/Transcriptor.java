@@ -11,7 +11,7 @@ import java.util.*;
 
 import static libpianotranscription.midi.MidiWriter.writeEventsToMidi;
 
-public class Transcriptor {
+public class Transcriptor implements AutoCloseable {
     private final OrtEnvironment _env;
     private final OrtSession _session;
     private final int segment_samples = 16000 * 10;
@@ -25,6 +25,11 @@ public class Transcriptor {
     public Transcriptor(String modulePath) throws OrtException {
         this._env = OrtEnvironment.getEnvironment();//OrtEnvironment型变量是onnx运行时系统的主机对象。可以创建封装的 OrtSessions 特定型号。
         this._session = this._env.createSession(modulePath);//使用默认的OrtSession.SessionOptions、模型和默认内存分配器创建会话。
+    }
+
+    @Override
+    public void close() throws OrtException {
+        this._session.close();
     }
 
     public byte[] transcript(float[] pcm_data) throws InvalidMidiDataException, IOException, OrtException {
@@ -83,14 +88,16 @@ public class Transcriptor {
             System.out.println("Segment " + pointer + " / " + total_segments);
             if (pointer >= data.size()) break;//已经遍历完，循环结束
             //var tensor = Tensor.fromBlob(data.get(pointer), new long[]{1, segment_samples});
-            var tensor = OnnxTensor.createTensor(_env, FloatBuffer.wrap(data.get(pointer)), new long[]{1, segment_samples});
-            //var batch_output_dict = this._module.forward(IValue.from(tensor));
-            var inputs = Map.of("input", tensor);
-            var output = _session.run(inputs);
-            for (var i :
-                    output) {
-                var value = (float[][][]) i.getValue().getValue();
-                output_dic.get(i.getKey()).add(value[0]);
+            try (var tensor = OnnxTensor.createTensor(_env, FloatBuffer.wrap(data.get(pointer)), new long[]{1, segment_samples})) {
+                //var batch_output_dict = this._module.forward(IValue.from(tensor));
+                var inputs = Map.of("input", tensor);
+                try (var output = _session.run(inputs)) {
+                    for (var i :
+                            output) {
+                        var value = (float[][][]) i.getValue().getValue();
+                        output_dic.get(i.getKey()).add(value[0]);
+                    }
+                }
             }
             pointer += batch_size;
         }

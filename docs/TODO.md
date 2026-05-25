@@ -222,7 +222,7 @@ and total conversion time.
 Implementation scope:
 
 - Keep profiling lightweight with stdout timing logs and async job messages.
-- Do not reuse ONNX sessions until conversion timing data is reviewed.
+- Use profiling data to validate that ONNX session reuse improved performance.
 - Keep the current sync and async conversion API shape unchanged.
 
 Acceptance criteria:
@@ -231,6 +231,26 @@ Acceptance criteria:
 - Backend logs show phase timing for each conversion.
 - The next optimization decision is based on measured session creation and
   transcription time, not assumptions.
+
+### P2: ONNX Session Reuse
+
+Goal: remove repeated ONNX session creation from each conversion while keeping
+conversion behavior and API shape unchanged.
+
+Status: V1 done with a lazy shared `Transcriptor`, model-path replacement,
+synchronized access for the reused session, and shutdown cleanup.
+
+Implementation scope:
+
+- Reuse one backend `Transcriptor` for the active model path.
+- Keep conversion profiling active so reuse impact remains visible.
+- Close ONNX session resources when the service shuts down or model path changes.
+
+Acceptance criteria:
+
+- Consecutive conversions succeed with the same backend process.
+- The second conversion reports little or no `sessionCreateMs`.
+- Inference and MIDI generation timings remain visible for future optimization.
 
 ### P3: Alternative Transcription Engine Research
 
@@ -251,6 +271,5 @@ Acceptance criteria:
 
 ## Near-Term Recommended Order
 
-1. Evaluate ONNX session reuse from profiling data.
-2. Add Bass + Melody Split after MIDI channel rewriting is explicit.
-3. Revisit alternative transcription engines.
+1. Add Bass + Melody Split after MIDI channel rewriting is explicit.
+2. Revisit alternative transcription engines.
