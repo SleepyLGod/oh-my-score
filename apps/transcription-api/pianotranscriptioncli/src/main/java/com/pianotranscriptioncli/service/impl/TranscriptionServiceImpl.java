@@ -99,12 +99,14 @@ public class TranscriptionServiceImpl implements TranscriptionService {
 
         Path inputFile = inputDir.resolve(safeSongName + "." + extension);
         Path outputFile = outputDir.resolve(safeSongName + ".mid");
+        long uploadStoreStart = System.nanoTime();
         try (InputStream inputStream = file.getInputStream()) {
             Files.copy(inputStream, inputFile, StandardCopyOption.REPLACE_EXISTING);
         }
+        long uploadStoreMs = elapsedMs(uploadStoreStart);
         System.out.println("音频文件存入成功!");
 
-        return convertSavedAudioToMidi(inputFile, outputFile, tmpDir);
+        return convertSavedAudioToMidi(inputFile, outputFile, tmpDir, uploadStoreMs).getOutputPath();
     }
 
     @Override
@@ -134,12 +136,14 @@ public class TranscriptionServiceImpl implements TranscriptionService {
         job.jobDir = jobDir;
         Path inputFile = jobDir.resolve("input." + extension);
         Path outputFile = jobDir.resolve(safeSongName + ".mid");
+        long uploadStoreStart = System.nanoTime();
         try (InputStream inputStream = file.getInputStream()) {
             Files.copy(inputStream, inputFile, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException exception) {
             job.fail("Failed to store uploaded audio: " + exception.getMessage());
             return toResponse(job);
         }
+        job.uploadStoreMs = elapsedMs(uploadStoreStart);
 
         job.inputPath = inputFile;
         job.outputPath = outputFile;
@@ -198,27 +202,30 @@ public class TranscriptionServiceImpl implements TranscriptionService {
         job.status = "running";
         job.message = "Running conversion.";
         try {
-            Path midiPath = convertSavedAudioToMidi(job.inputPath, job.outputPath, tmpDir);
-            job.outputPath = midiPath;
+            Utils.ConversionResult result = convertSavedAudioToMidi(job.inputPath, job.outputPath, tmpDir, job.uploadStoreMs);
+            job.outputPath = result.getOutputPath();
             job.status = "succeeded";
-            job.message = "Conversion succeeded.";
+            job.message = "Conversion succeeded in "
+                    + formatSeconds(job.uploadStoreMs + result.getTiming().getTotalMs()) + ".";
             job.completedAtMs = System.currentTimeMillis();
         } catch (Exception exception) {
             job.fail(userFacingConversionMessage(exception));
         }
     }
 
-    private Path convertSavedAudioToMidi(Path inputFile, Path outputFile, Path tmpDir) throws Exception {
+    private Utils.ConversionResult convertSavedAudioToMidi(Path inputFile, Path outputFile, Path tmpDir,
+                                                           long uploadStoreMs) throws Exception {
         Path model = Path.of(modelPath);
         if (!Files.exists(model)) {
             throw new FileNotFoundException("ONNX model not found: " + model);
         }
 
-        String output = Utils.convertAudioToMidi(inputFile, outputFile, model, tmpDir);
-        if (output == null) {
+        Utils.ConversionResult result = Utils.convertAudioToMidiWithTiming(inputFile, outputFile, model, tmpDir);
+        if (result.getOutputPath() == null) {
             throw new IOException("Audio conversion failed.");
         }
-        return Path.of(output);
+        System.out.println(result.getTiming().toLogLine(uploadStoreMs, inputFile, outputFile));
+        return result;
     }
 
     private TranscriptionJobResponse toResponse(TranscriptionJob job) {
@@ -233,6 +240,14 @@ public class TranscriptionServiceImpl implements TranscriptionService {
             return "Backend conversion failed.";
         }
         return message;
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
+    }
+
+    private String formatSeconds(long milliseconds) {
+        return String.format(Locale.ROOT, "%.2fs", milliseconds / 1000.0);
     }
 
     private void cleanupOldJobs() {
@@ -326,6 +341,7 @@ public class TranscriptionServiceImpl implements TranscriptionService {
         private volatile Path outputPath;
         private volatile Path jobDir;
         private volatile Long completedAtMs;
+        private volatile long uploadStoreMs;
 
         private TranscriptionJob(String id) {
             this.id = id;

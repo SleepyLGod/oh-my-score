@@ -210,6 +210,28 @@ Acceptance criteria:
 - Failed jobs return actionable error messages for missing model, unsupported
   format, decode failure, and backend failure.
 
+### P2: Conversion Performance Profiling
+
+Goal: make backend conversion bottlenecks visible before changing the
+transcription engine lifecycle.
+
+Status: V1 done with backend timing logs for upload/store, ffmpeg preprocessing,
+PCM read/normalization, ONNX session creation, transcription/MIDI generation,
+and total conversion time.
+
+Implementation scope:
+
+- Keep profiling lightweight with stdout timing logs and async job messages.
+- Do not reuse ONNX sessions until conversion timing data is reviewed.
+- Keep the current sync and async conversion API shape unchanged.
+
+Acceptance criteria:
+
+- Successful async jobs include elapsed conversion time in their status message.
+- Backend logs show phase timing for each conversion.
+- The next optimization decision is based on measured session creation and
+  transcription time, not assumptions.
+
 ### P3: Alternative Transcription Engine Research
 
 Goal: evaluate whether another model improves useful output.
@@ -229,6 +251,6 @@ Acceptance criteria:
 
 ## Near-Term Recommended Order
 
-1. Profile conversion time and evaluate ONNX session reuse.
+1. Evaluate ONNX session reuse from profiling data.
 2. Add Bass + Melody Split after MIDI channel rewriting is explicit.
 3. Revisit alternative transcription engines.
