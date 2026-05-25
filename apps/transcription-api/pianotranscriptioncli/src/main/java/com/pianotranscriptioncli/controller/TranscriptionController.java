@@ -2,6 +2,7 @@ package com.pianotranscriptioncli.controller;
 
 import com.pianotranscriptioncli.common.api.CommonResult;
 import com.pianotranscriptioncli.dto.Mp3ImportDTO;
+import com.pianotranscriptioncli.dto.TranscriptionJobResponse;
 import com.pianotranscriptioncli.service.TranscriptionService;
 import com.pianotranscriptioncli.vo.Mp3ImportVO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,8 +53,49 @@ public class TranscriptionController {
     public ResponseEntity<Resource> AudioToMidiWithFile(@RequestParam("file") MultipartFile file,
                                                         @RequestParam("songName") String songName) throws Exception {
         Path midiPath = transcriptionService.AudioTOMidiUploadWithFile(file, songName);
-        InputStreamResource resource = new InputStreamResource(Files.newInputStream(midiPath));
         String downloadName = songName + ".mid";
+        return midiResponse(midiPath, downloadName);
+    }
+
+    @ResponseBody
+    @PostMapping(value = "/jobs", consumes = {"multipart/form-data"})
+    public TranscriptionJobResponse createJob(@RequestParam("file") MultipartFile file,
+                                              @RequestParam("songName") String songName) throws Exception {
+        return transcriptionService.createAudioToMidiJob(file, songName);
+    }
+
+    @GetMapping(value = "/jobs/{id}")
+    public ResponseEntity<TranscriptionJobResponse> getJob(@PathVariable("id") String id) {
+        TranscriptionJobResponse job = transcriptionService.getTranscriptionJob(id);
+        if (job == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(job);
+    }
+
+    @GetMapping(value = "/jobs/{id}/midi")
+    public ResponseEntity<?> getJobMidi(@PathVariable("id") String id) throws Exception {
+        TranscriptionJobResponse job = transcriptionService.getTranscriptionJob(id);
+        if (job == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!"succeeded".equals(job.getStatus())) {
+            return ResponseEntity.status(409).body(job);
+        }
+        Path midiPath = job.getMidiPath();
+        if (midiPath == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return midiResponse(midiPath, midiPath.getFileName().toString());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> badRequest(IllegalArgumentException exception) {
+        return ResponseEntity.badRequest().body(exception.getMessage());
+    }
+
+    private ResponseEntity<Resource> midiResponse(Path midiPath, String downloadName) throws Exception {
+        InputStreamResource resource = new InputStreamResource(Files.newInputStream(midiPath));
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("audio/midi"))
                 .contentLength(Files.size(midiPath))
@@ -63,11 +105,6 @@ public class TranscriptionController {
                                 .build()
                                 .toString())
                 .body(resource);
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<String> badRequest(IllegalArgumentException exception) {
-        return ResponseEntity.badRequest().body(exception.getMessage());
     }
 
 }

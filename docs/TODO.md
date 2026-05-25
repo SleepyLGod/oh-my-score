@@ -193,15 +193,19 @@ Acceptance criteria:
 
 Goal: support longer audio files without blocking the UI on one request.
 
+Status: V1 done with in-memory backend jobs, single-worker conversion, frontend
+status polling, and completed MIDI download back into the existing player flow.
+
 Implementation scope:
 
-- Add job creation, status polling, and result download endpoints.
+- Keep job creation, status polling, and result download endpoints small and
+  compatible with the current Docker-isolated runtime.
 - Keep the current synchronous endpoint for compatibility.
 - Store job artifacts under the existing isolated runtime directory.
 
 Acceptance criteria:
 
-- Long conversions show pending/running/succeeded/failed states.
+- Long conversions show queued/running/succeeded/failed states.
 - Completed jobs expose a MIDI download path.
 - Failed jobs return actionable error messages for missing model, unsupported
   format, decode failure, and backend failure.
@@ -225,7 +229,6 @@ Acceptance criteria:
 
 ## Near-Term Recommended Order
 
-1. Add async conversion jobs.
-2. Profile conversion time and evaluate ONNX session reuse.
-3. Add Bass + Melody Split after MIDI channel rewriting is explicit.
-4. Revisit alternative transcription engines.
+1. Profile conversion time and evaluate ONNX session reuse.
+2. Add Bass + Melody Split after MIDI channel rewriting is explicit.
+3. Revisit alternative transcription engines.

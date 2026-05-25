@@ -2,8 +2,11 @@ package com.pianotranscriptioncli.service.impl;
 
 import com.pianotranscriptioncli.common.api.CommonResult;
 import com.pianotranscriptioncli.dto.Mp3ImportDTO;
+import com.pianotranscriptioncli.dto.TranscriptionJobResponse;
 import com.pianotranscriptioncli.service.TranscriptionService;
 import com.pianotranscriptioncli.utils.Utils;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -12,15 +15,42 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Comparator;
 import java.util.Locale;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 @Service
 public class TranscriptionServiceImpl implements TranscriptionService {
+    private static final long JOB_RETENTION_MS = TimeUnit.HOURS.toMillis(24);
+
     @Value("${omg.transcription.work-dir}")
     private String workDir;
 
     @Value("${omg.transcription.model-path}")
     private String modelPath;
+
+    private final ConcurrentHashMap<String, TranscriptionJob> jobs = new ConcurrentHashMap<>();
+    private final ExecutorService conversionExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "omg-transcription-worker");
+        return thread;
+    });
+    private final ScheduledExecutorService cleanupExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "omg-transcription-cleanup");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    @PostConstruct
+    public void startCleanup() {
+        cleanupExecutor.scheduleAtFixedRate(this::cleanupOldJobs, 5, 5, TimeUnit.MINUTES);
+    }
 
     @Override
     public CommonResult Mp3TOMidiUpload(Mp3ImportDTO mp3ImportDTO) throws Exception {
@@ -58,11 +88,6 @@ public class TranscriptionServiceImpl implements TranscriptionService {
             throw new IllegalArgumentException("音频文件不能为空");
         }
 
-        Path model = Path.of(modelPath);
-        if (!Files.exists(model)) {
-            throw new FileNotFoundException("ONNX model not found: " + model);
-        }
-
         String safeSongName = sanitizeSongName(songName);
         String extension = audioExtension(file);
         Path root = Path.of(workDir);
@@ -79,16 +104,164 @@ public class TranscriptionServiceImpl implements TranscriptionService {
         }
         System.out.println("音频文件存入成功!");
 
-        String output = Utils.convertAudioToMidi(inputFile, outputFile, model, tmpDir);
-        if (output == null) {
-            throw new IOException("音频转换失败");
+        return convertSavedAudioToMidi(inputFile, outputFile, tmpDir);
+    }
+
+    @Override
+    public TranscriptionJobResponse createAudioToMidiJob(MultipartFile file, String songName) throws Exception {
+        cleanupOldJobs();
+        String jobId = UUID.randomUUID().toString();
+        String safeSongName = sanitizeSongName(songName);
+        TranscriptionJob job = new TranscriptionJob(jobId);
+        jobs.put(jobId, job);
+
+        if (file.isEmpty()) {
+            job.fail("Audio file is empty.");
+            return toResponse(job);
         }
-        return Path.of(output);
+
+        String extension;
+        try {
+            extension = audioExtension(file);
+        } catch (IllegalArgumentException exception) {
+            job.fail(exception.getMessage());
+            return toResponse(job);
+        }
+
+        Path jobDir = Path.of(workDir).resolve("jobs").resolve(jobId);
+        Path tmpDir = jobDir.resolve("tmp");
+        Files.createDirectories(jobDir);
+        job.jobDir = jobDir;
+        Path inputFile = jobDir.resolve("input." + extension);
+        Path outputFile = jobDir.resolve(safeSongName + ".mid");
+        try (InputStream inputStream = file.getInputStream()) {
+            Files.copy(inputStream, inputFile, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException exception) {
+            job.fail("Failed to store uploaded audio: " + exception.getMessage());
+            return toResponse(job);
+        }
+
+        job.inputPath = inputFile;
+        job.outputPath = outputFile;
+        job.status = "queued";
+        job.message = "Queued conversion.";
+        if (conversionExecutor.isShutdown()) {
+            job.fail("Backend is shutting down. Retry conversion after restart.");
+            return toResponse(job);
+        }
+        try {
+            conversionExecutor.submit(() -> runConversionJob(job, tmpDir));
+        } catch (RejectedExecutionException exception) {
+            job.fail("Backend is shutting down. Retry conversion after restart.");
+        }
+        return toResponse(job);
+    }
+
+    @Override
+    public TranscriptionJobResponse getTranscriptionJob(String id) {
+        TranscriptionJob job = jobs.get(id);
+        if (job == null) {
+            return null;
+        }
+        return toResponse(job);
+    }
+
+    @Override
+    public Path getTranscriptionJobMidi(String id) {
+        TranscriptionJob job = jobs.get(id);
+        if (job == null || !"succeeded".equals(job.status)) {
+            return null;
+        }
+        return job.outputPath;
     }
 
     @Override
     public String WavToMidiUpload() {
         return "null";
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        cleanupExecutor.shutdownNow();
+        conversionExecutor.shutdown();
+        try {
+            if (!conversionExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
+                conversionExecutor.shutdownNow();
+            }
+        } catch (InterruptedException exception) {
+            conversionExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void runConversionJob(TranscriptionJob job, Path tmpDir) {
+        job.status = "running";
+        job.message = "Running conversion.";
+        try {
+            Path midiPath = convertSavedAudioToMidi(job.inputPath, job.outputPath, tmpDir);
+            job.outputPath = midiPath;
+            job.status = "succeeded";
+            job.message = "Conversion succeeded.";
+            job.completedAtMs = System.currentTimeMillis();
+        } catch (Exception exception) {
+            job.fail(userFacingConversionMessage(exception));
+        }
+    }
+
+    private Path convertSavedAudioToMidi(Path inputFile, Path outputFile, Path tmpDir) throws Exception {
+        Path model = Path.of(modelPath);
+        if (!Files.exists(model)) {
+            throw new FileNotFoundException("ONNX model not found: " + model);
+        }
+
+        String output = Utils.convertAudioToMidi(inputFile, outputFile, model, tmpDir);
+        if (output == null) {
+            throw new IOException("Audio conversion failed.");
+        }
+        return Path.of(output);
+    }
+
+    private TranscriptionJobResponse toResponse(TranscriptionJob job) {
+        String downloadUrl = "succeeded".equals(job.status) ? "/transcription/jobs/" + job.id + "/midi" : null;
+        Path midiPath = "succeeded".equals(job.status) ? job.outputPath : null;
+        return new TranscriptionJobResponse(job.id, job.status, job.message, downloadUrl, midiPath);
+    }
+
+    private String userFacingConversionMessage(Exception exception) {
+        String message = exception.getMessage();
+        if (message == null || message.isBlank()) {
+            return "Backend conversion failed.";
+        }
+        return message;
+    }
+
+    private void cleanupOldJobs() {
+        long cutoffMs = System.currentTimeMillis() - JOB_RETENTION_MS;
+        jobs.entrySet().removeIf(entry -> {
+            TranscriptionJob job = entry.getValue();
+            if (job.completedAtMs == null || job.completedAtMs >= cutoffMs) {
+                return false;
+            }
+            deleteJobDirectory(job);
+            return true;
+        });
+    }
+
+    private void deleteJobDirectory(TranscriptionJob job) {
+        if (job.jobDir == null || !Files.exists(job.jobDir)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(job.jobDir)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException exception) {
+                    System.err.println("Failed to delete job artifact: " + path + " (" + exception.getMessage() + ")");
+                }
+            });
+        } catch (IOException exception) {
+            System.err.println("Failed to clean transcription job directory: " + exception.getMessage());
+        }
     }
 
     private Path normalizePath(String path) {
@@ -143,5 +316,25 @@ public class TranscriptionServiceImpl implements TranscriptionService {
             return "wav";
         }
         return "";
+    }
+
+    private static class TranscriptionJob {
+        private final String id;
+        private volatile String status = "queued";
+        private volatile String message = "Queued conversion.";
+        private volatile Path inputPath;
+        private volatile Path outputPath;
+        private volatile Path jobDir;
+        private volatile Long completedAtMs;
+
+        private TranscriptionJob(String id) {
+            this.id = id;
+        }
+
+        private void fail(String message) {
+            this.status = "failed";
+            this.message = message;
+            this.completedAtMs = System.currentTimeMillis();
+        }
     }
 }

@@ -1,7 +1,9 @@
 
 MIDI.loader = new widgets.Loader({ message: "Loading: Soundfont...", background: "rgba(16,18,21,0.88)" });
 var localTranscriptionApiUrl = "http://localhost:8084/transcription/audioToMidiWithFile";
+var localTranscriptionJobsApiUrl = "http://localhost:8084/transcription/jobs";
 var transcriptionApiUrl = window.OMG_TRANSCRIPTION_API_URL || defaultTranscriptionApiUrl();
+var transcriptionJobsApiUrl = window.OMG_TRANSCRIPTION_JOBS_API_URL || defaultTranscriptionJobsApiUrl();
 var activeMidiUrl = null;
 var convertedMidiUrl = null;
 var localMidiUrl = null;
@@ -74,6 +76,8 @@ var isSeekingTimeline = false;
 var wasPlayingBeforeSeek = false;
 var playbackClockStartMs = 0;
 var playbackClockBaseSeconds = 0;
+var conversionPollDelayMs = 1200;
+var maxConversionPollAttempts = 500;
 var noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 var arrangementPresets = {
     piano: { label: "Piano", program: 0 },
@@ -136,6 +140,17 @@ function defaultTranscriptionApiUrl() {
     var host = window.location.hostname;
     if (host === "localhost" || host === "127.0.0.1" || host === "") {
         return localTranscriptionApiUrl;
+    }
+    return "";
+}
+
+function defaultTranscriptionJobsApiUrl() {
+    if (transcriptionApiUrl) {
+        return transcriptionApiUrl.replace(/\/(?:audioToMidiWithFile|mp3ToMidiWithFile)$/, "/jobs");
+    }
+    var host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "") {
+        return localTranscriptionJobsApiUrl;
     }
     return "";
 }
@@ -1215,6 +1230,130 @@ function responseError(response) {
     });
 }
 
+function waitForConversionPoll() {
+    return new Promise(function (resolve) {
+        window.setTimeout(resolve, conversionPollDelayMs);
+    });
+}
+
+function asyncEndpointUnavailableError() {
+    var error = new Error("Async conversion endpoint unavailable.");
+    error.fallbackToSync = true;
+    return error;
+}
+
+function resolveJobUrl(url) {
+    if (!url) return "";
+    return new URL(url, transcriptionJobsApiUrl).href;
+}
+
+function conversionJobUrl(id) {
+    return transcriptionJobsApiUrl.replace(/\/$/, "") + "/" + encodeURIComponent(id);
+}
+
+function conversionJobStatusMessage(job) {
+    var status = job && job.status ? job.status : "";
+    var message = job && job.message ? job.message : "";
+    if (status === "queued") return "Queued conversion...";
+    if (status === "running") return "Running conversion...";
+    if (status === "succeeded") return "Converted and loaded";
+    if (status === "failed") return "Conversion failed: " + (message || "Backend conversion failed.");
+    return message || "Waiting for conversion...";
+}
+
+function loadConvertedMidiFromJob(job, songName) {
+    var downloadUrl = resolveJobUrl(job.downloadUrl);
+    if (!downloadUrl) {
+        throw new Error("Conversion job did not provide a MIDI download URL.");
+    }
+    return fetch(downloadUrl).then(function (response) {
+        if (!response.ok) {
+            return responseError(response);
+        }
+        return response.blob();
+    }).then(function (blob) {
+        var downloadName = downloadNameFromSongName(songName);
+        loadConvertedMidi(blob, downloadName, songName);
+        setUploadStatus("Converted and loaded");
+        showConversionResult(downloadName, blob);
+        activeSongTitle.textContent = songName;
+    });
+}
+
+function pollConversionJob(jobUrl, songName, attempt) {
+    attempt = attempt || 1;
+    if (attempt > maxConversionPollAttempts) {
+        return Promise.reject(new Error("Conversion polling timed out. Retry the conversion or check Docker logs."));
+    }
+    return fetch(jobUrl).then(function (response) {
+        if (!response.ok) {
+            return responseError(response);
+        }
+        return response.json();
+    }).then(function (job) {
+        setUploadStatus(conversionJobStatusMessage(job));
+        if (job.status === "succeeded") {
+            return loadConvertedMidiFromJob(job, songName);
+        }
+        if (job.status === "failed") {
+            throw new Error(job.message || "Backend conversion failed.");
+        }
+        return waitForConversionPoll().then(function () {
+            return pollConversionJob(jobUrl, songName, attempt + 1);
+        });
+    });
+}
+
+function runAsyncConversion(formData, songName) {
+    if (!transcriptionJobsApiUrl) {
+        return Promise.reject(asyncEndpointUnavailableError());
+    }
+    setUploadStatus("Queued conversion...");
+    return fetch(transcriptionJobsApiUrl, {
+        method: "POST",
+        body: formData
+    }).then(function (response) {
+        if (response.status === 404 || response.status === 405) {
+            throw asyncEndpointUnavailableError();
+        }
+        if (!response.ok) {
+            return responseError(response);
+        }
+        return response.json();
+    }).then(function (job) {
+        if (!job || !job.id) {
+            throw new Error("Conversion job response did not include a job id.");
+        }
+        setUploadStatus(conversionJobStatusMessage(job));
+        if (job.status === "failed") {
+            throw new Error(job.message || "Backend conversion failed.");
+        }
+        return pollConversionJob(conversionJobUrl(job.id), songName);
+    });
+}
+
+function runSynchronousConversion(formData, songName) {
+    if (!transcriptionApiUrl) {
+        return Promise.reject(new Error("Needs local Docker backend"));
+    }
+    setUploadStatus("Converting. This may take a minute.");
+    return fetch(transcriptionApiUrl, {
+        method: "POST",
+        body: formData
+    }).then(function (response) {
+        if (!response.ok) {
+            return responseError(response);
+        }
+        return response.blob();
+    }).then(function (blob) {
+        var downloadName = downloadNameFromSongName(songName);
+        loadConvertedMidi(blob, downloadName, songName);
+        setUploadStatus("Converted and loaded");
+        showConversionResult(downloadName, blob);
+        activeSongTitle.textContent = songName;
+    });
+}
+
 uploadFileInput.onchange = function () {
     var file = uploadFileInput.files[0];
     fileName.textContent = file ? file.name : "No file selected";
@@ -1256,7 +1395,7 @@ retryConvertButton.onclick = function () {
 convertButton.onclick = function () {
     var file = uploadFileInput.files[0];
     if (!file) return;
-    if (!transcriptionApiUrl) {
+    if (!transcriptionApiUrl && !transcriptionJobsApiUrl) {
         setUploadStatus("Needs local Docker backend");
         return;
     }
@@ -1268,22 +1407,12 @@ convertButton.onclick = function () {
 
     convertButton.disabled = true;
     hideConversionResult();
-    setUploadStatus("Converting. This may take a minute.");
-
-    fetch(transcriptionApiUrl, {
-        method: "POST",
-        body: formData
-    }).then(function (response) {
-        if (!response.ok) {
-            return responseError(response);
+    runAsyncConversion(formData, songName).catch(function (error) {
+        if (error && error.fallbackToSync) {
+            setUploadStatus("Async endpoint unavailable. Trying direct conversion.");
+            return runSynchronousConversion(formData, songName);
         }
-        return response.blob();
-    }).then(function (blob) {
-        var downloadName = downloadNameFromSongName(songName);
-        loadConvertedMidi(blob, downloadName, songName);
-        setUploadStatus("Converted and loaded");
-        showConversionResult(downloadName, blob);
-        activeSongTitle.textContent = songName;
+        throw error;
     }).catch(function (error) {
         console.error(error);
         setUploadStatus(conversionErrorMessage(error));

@@ -28,6 +28,12 @@ http://localhost:8084
 - `POST /transcription/audioToMidiWithFile` accepts `multipart/form-data` with
   an MP3 or WAV `file` field and returns a generated `.mid` file.
 - `POST /transcription/mp3ToMidiWithFile` remains as a compatibility alias.
+- `POST /transcription/jobs` accepts the same `multipart/form-data` fields and
+  returns a conversion job id, status, message, and MIDI download URL when ready.
+- `GET /transcription/jobs/{id}` returns `queued`, `running`, `succeeded`, or
+  `failed` status for an async conversion job.
+- `GET /transcription/jobs/{id}/midi` downloads the generated MIDI once the job
+  has succeeded.
 
 ## Configuration
 

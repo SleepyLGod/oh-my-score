@@ -90,6 +90,11 @@ If conversion fails with a missing model error, confirm that
 - `POST /transcription/audioToMidiWithFile` accepts `multipart/form-data` with
   an MP3 or WAV `file` field and returns a generated `.mid` file.
 - `POST /transcription/mp3ToMidiWithFile` is kept as a compatibility alias.
+- `POST /transcription/jobs` starts an async MP3/WAV conversion job.
+- `GET /transcription/jobs/{id}` returns queued, running, succeeded, or failed
+  status for a conversion job.
+- `GET /transcription/jobs/{id}/midi` downloads the generated MIDI for a
+  job in the succeeded state.
 
 ## Roadmap
 
@@ -109,7 +114,7 @@ If conversion fails with a missing model error, confirm that
 - [x] Export simple instrument preset MIDI variants.
 - [x] Add playback timeline and seek controls.
 - [x] Run frontend and backend CI on GitHub Actions.
-- [ ] Add progress tracking for long-running conversion jobs.
+- [x] Add progress tracking for long-running conversion jobs.
 - [ ] Profile conversion time and evaluate ONNX session reuse.
 - [ ] Research multi-instrument MIDI playback and visualization.
 
