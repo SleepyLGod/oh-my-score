@@ -295,7 +295,7 @@ function resetCleanedMidi(message) {
     downloadCleanedMidiLink.removeAttribute("href");
     downloadCleanedMidiLink.removeAttribute("download");
     loadCleanedMidiButton.hidden = true;
-    cleanupStatus.textContent = message || "Cleanup keeps the source MIDI unchanged.";
+    cleanupStatus.textContent = message || "Cleaned MIDI is a separate variant. Source MIDI stays unchanged.";
 }
 
 function resetPresetMidi(message) {
@@ -313,7 +313,7 @@ function resetPresetMidi(message) {
     downloadPresetMidiLink.removeAttribute("href");
     downloadPresetMidiLink.removeAttribute("download");
     loadPresetMidiButton.hidden = true;
-    presetStatus.textContent = message || "Presets create arrangement sketches without changing the source MIDI.";
+    presetStatus.textContent = message || "Presets create separate arrangement sketches. Source MIDI stays unchanged.";
 }
 
 function resetSourceMidiDownload() {
@@ -928,6 +928,13 @@ function createPresetMidi() {
     }
 }
 
+function currentVariantPreserveOptions() {
+    return {
+        preserveCleaned: !!cleanedMidiBytes,
+        preservePreset: !!presetMidiBytes
+    };
+}
+
 function loadPresetMidi() {
     if (!presetMidiBytes || !midiReady) return;
 
@@ -938,7 +945,8 @@ function loadPresetMidi() {
     }
     presetPlaybackUrl = midiBytesToDataUrl(presetMidiBytes);
     activeSongTitle.textContent = (sourceMidiTitle || activeSongTitle.textContent || "Score") + " (Preset: " + presetLabel + ")";
-    setUploadStatus(presetLabel + " preset loaded");
+    setUploadStatus(presetLabel + " preset variant loaded");
+    presetStatus.textContent = presetLabel + " preset variant loaded. Source MIDI stays unchanged.";
     loadMidiFile(presetPlaybackUrl, false, { preserveCleaned: true, preservePreset: true });
 }
 
@@ -950,8 +958,12 @@ function loadCleanedMidi() {
     }
     cleanedPlaybackUrl = midiBytesToDataUrl(cleanedMidiBytes);
     activeSongTitle.textContent = (sourceMidiTitle || activeSongTitle.textContent || "Score") + " (Cleaned)";
-    setUploadStatus("Cleaned MIDI loaded");
-    loadMidiFile(cleanedPlaybackUrl, false, { preserveCleaned: true });
+    setUploadStatus("Cleaned MIDI variant loaded");
+    cleanupStatus.textContent = "Cleaned MIDI variant loaded. Source MIDI stays unchanged.";
+    loadMidiFile(cleanedPlaybackUrl, false, {
+        preserveCleaned: true,
+        preservePreset: !!presetMidiBytes
+    });
 }
 
 function objectKeyCount(object) {
@@ -1092,7 +1104,7 @@ function loadConvertedMidi(blob, downloadName, title) {
 
 function reloadActiveMidi() {
     if (activeMidiUrl) {
-        loadMidiFile(activeMidiUrl, true, { preserveCleaned: activeMidiUrl === cleanedPlaybackUrl });
+        loadMidiFile(activeMidiUrl, true, currentVariantPreserveOptions());
     }
 }
 
@@ -1141,7 +1153,7 @@ function restartPlayback() {
     if (!activeMidiUrl || !midiReady) return;
     loopRestartQueued = false;
     updateTimelinePosition(0);
-    loadMidiFile(activeMidiUrl, true, { preserveCleaned: activeMidiUrl === cleanedPlaybackUrl });
+    loadMidiFile(activeMidiUrl, true, currentVariantPreserveOptions());
 }
 
 function setLoopEnabled(enabled) {
@@ -1261,6 +1273,22 @@ function conversionJobStatusMessage(job) {
     return message || "Waiting for conversion...";
 }
 
+function conversionElapsedText(job) {
+    var message = job && job.message ? job.message : "";
+    var match = message.match(/in\s+([0-9]+(?:\.[0-9]+)?s)/i);
+    return match ? match[1] : "";
+}
+
+function conversionLoadedStatusMessage(job) {
+    var elapsedText = conversionElapsedText(job);
+    return elapsedText ? "Converted and loaded in " + elapsedText : "Converted and loaded";
+}
+
+function conversionSucceededLoadingMessage(job) {
+    var elapsedText = conversionElapsedText(job);
+    return elapsedText ? "Conversion succeeded in " + elapsedText + ". Loading MIDI..." : "Conversion succeeded. Loading MIDI...";
+}
+
 function loadConvertedMidiFromJob(job, songName) {
     var downloadUrl = resolveJobUrl(job.downloadUrl);
     if (!downloadUrl) {
@@ -1274,7 +1302,7 @@ function loadConvertedMidiFromJob(job, songName) {
     }).then(function (blob) {
         var downloadName = downloadNameFromSongName(songName);
         loadConvertedMidi(blob, downloadName, songName);
-        setUploadStatus("Converted and loaded");
+        setUploadStatus(conversionLoadedStatusMessage(job));
         showConversionResult(downloadName, blob);
         activeSongTitle.textContent = songName;
     });
@@ -1291,10 +1319,11 @@ function pollConversionJob(jobUrl, songName, attempt) {
         }
         return response.json();
     }).then(function (job) {
-        setUploadStatus(conversionJobStatusMessage(job));
         if (job.status === "succeeded") {
+            setUploadStatus(conversionSucceededLoadingMessage(job));
             return loadConvertedMidiFromJob(job, songName);
         }
+        setUploadStatus(conversionJobStatusMessage(job));
         if (job.status === "failed") {
             throw new Error(job.message || "Backend conversion failed.");
         }

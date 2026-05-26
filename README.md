@@ -115,7 +115,7 @@ If conversion fails with a missing model error, confirm that
 - [x] Add playback timeline and seek controls.
 - [x] Run frontend and backend CI on GitHub Actions.
 - [x] Add progress tracking for long-running conversion jobs.
-- [ ] Profile conversion time and evaluate ONNX session reuse.
+- [x] Profile conversion time and reuse the ONNX transcription session.
 - [ ] Research multi-instrument MIDI playback and visualization.
 
 See [`docs/TODO.md`](./docs/TODO.md) for the detailed Smart Score roadmap.

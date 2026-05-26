@@ -252,6 +252,27 @@ Acceptance criteria:
 - The second conversion reports little or no `sessionCreateMs`.
 - Inference and MIDI generation timings remain visible for future optimization.
 
+### P2: Current Workflow Polish
+
+Goal: make the completed Smart Score workflow clearer before adding larger
+features.
+
+Status: V1 done for clearer conversion elapsed-time status, source/cleaned/preset
+variant wording, variant reload behavior, and README roadmap synchronization.
+
+Implementation scope:
+
+- Keep conversion, analysis, cleanup, preset, and playback APIs unchanged.
+- Make UI status messages distinguish source MIDI, cleaned MIDI, and preset MIDI.
+- Keep completed profiling and ONNX session reuse visible in public docs.
+
+Acceptance criteria:
+
+- Async conversion success keeps elapsed-time context in the loaded state.
+- Restart and speed reload preserve existing cleaned and preset variant controls.
+- Docs do not imply Bass + Melody Split or alternative transcription engines are
+  already supported.
+
 ### P3: Alternative Transcription Engine Research
 
 Goal: evaluate whether another model improves useful output.
