@@ -1,5 +1,5 @@
 
-MIDI.loader = new widgets.Loader({ message: "Loading: Soundfont...", background: "rgba(16,18,21,0.88)" });
+MIDI.loader = new widgets.Loader({ message: "Loading: Soundfonts...", background: "rgba(16,18,21,0.88)" });
 var localTranscriptionApiUrl = "http://localhost:8084/transcription/audioToMidiWithFile";
 var localTranscriptionJobsApiUrl = "http://localhost:8084/transcription/jobs";
 var transcriptionApiUrl = window.OMG_TRANSCRIPTION_API_URL || defaultTranscriptionApiUrl();
@@ -72,6 +72,7 @@ var loadPresetMidiButton = document.getElementById("load-preset-midi-button");
 var presetStatus = document.getElementById("preset-status");
 var analysisRequestId = 0;
 var timelineDurationSeconds = 0;
+var activePlaybackProgram = 0;
 var isSeekingTimeline = false;
 var wasPlayingBeforeSeek = false;
 var playbackClockStartMs = 0;
@@ -80,10 +81,15 @@ var conversionPollDelayMs = 1200;
 var maxConversionPollAttempts = 500;
 var noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 var arrangementPresets = {
-    piano: { label: "Piano", program: 0 },
-    strings: { label: "Strings", program: 48 },
-    "soft-synth": { label: "Soft Synth", program: 88 }
+    piano: { label: "Piano", program: 0, instrument: "acoustic_grand_piano" },
+    strings: { label: "Strings", program: 48, instrument: "string_ensemble_1" },
+    "soft-synth": { label: "Soft Synth", program: 88, instrument: "pad_1_new_age" }
 };
+var presetSoundfontInstruments = [
+    arrangementPresets.piano.instrument,
+    arrangementPresets.strings.instrument,
+    arrangementPresets["soft-synth"].instrument
+];
 var keyboardLayoutRows = [
     {
         element: lowerKeyRow,
@@ -313,7 +319,7 @@ function resetPresetMidi(message) {
     downloadPresetMidiLink.removeAttribute("href");
     downloadPresetMidiLink.removeAttribute("download");
     loadPresetMidiButton.hidden = true;
-    presetStatus.textContent = message || "Presets create separate arrangement sketches. Source MIDI stays unchanged.";
+    presetStatus.textContent = message || "Presets write General MIDI programs and use bundled browser soundfonts.";
 }
 
 function resetSourceMidiDownload() {
@@ -921,7 +927,8 @@ function createPresetMidi() {
         loadPresetMidiButton.hidden = false;
         presetStatus.textContent = preset.label + " preset ready: "
             + presetResult.stats.programChangesInserted + " inserted, "
-            + presetResult.stats.programChangesRewritten + " rewritten.";
+            + presetResult.stats.programChangesRewritten + " rewritten. Browser playback uses the bundled "
+            + preset.label + " soundfont.";
     } catch (error) {
         console.warn(error);
         resetPresetMidi("Preset unavailable for this MIDI file.");
@@ -931,7 +938,8 @@ function createPresetMidi() {
 function currentVariantPreserveOptions() {
     return {
         preserveCleaned: !!cleanedMidiBytes,
-        preservePreset: !!presetMidiBytes
+        preservePreset: !!presetMidiBytes,
+        playbackProgram: activePlaybackProgram
     };
 }
 
@@ -946,8 +954,12 @@ function loadPresetMidi() {
     presetPlaybackUrl = midiBytesToDataUrl(presetMidiBytes);
     activeSongTitle.textContent = (sourceMidiTitle || activeSongTitle.textContent || "Score") + " (Preset: " + presetLabel + ")";
     setUploadStatus(presetLabel + " preset variant loaded");
-    presetStatus.textContent = presetLabel + " preset variant loaded. Source MIDI stays unchanged.";
-    loadMidiFile(presetPlaybackUrl, false, { preserveCleaned: true, preservePreset: true });
+    presetStatus.textContent = presetLabel + " preset variant loaded with bundled browser soundfont. Source MIDI stays unchanged.";
+    loadMidiFile(presetPlaybackUrl, false, {
+        preserveCleaned: true,
+        preservePreset: true,
+        playbackProgram: preset.program
+    });
 }
 
 function loadCleanedMidi() {
@@ -962,7 +974,8 @@ function loadCleanedMidi() {
     cleanupStatus.textContent = "Cleaned MIDI variant loaded. Source MIDI stays unchanged.";
     loadMidiFile(cleanedPlaybackUrl, false, {
         preserveCleaned: true,
-        preservePreset: !!presetMidiBytes
+        preservePreset: !!presetMidiBytes,
+        playbackProgram: activePlaybackProgram
     });
 }
 
@@ -1070,9 +1083,11 @@ function downloadNameFromSongName(songName) {
 }
 
 function loadMidiFile(url, start, options) {
+    options = options || {};
     activeMidiUrl = url;
     analyzeMidiUrl(url, options);
     MIDI.Player.stop();
+    setPlaybackProgram(typeof options.playbackProgram === "number" ? options.playbackProgram : arrangementPresets.piano.program);
     syncPlayerSeekTime(0);
     releaseKeyboardNotes();
     playbackClockStartMs = 0;
@@ -1088,6 +1103,16 @@ function loadMidiFile(url, start, options) {
             startPlayback();
         }
     });
+}
+
+function setPlaybackProgram(program) {
+    activePlaybackProgram = program;
+    if (!midiReady || !MIDI.programChange) return;
+    for (var channel = 0; channel < 16; channel += 1) {
+        if (channel !== 9) {
+            MIDI.programChange(channel, program);
+        }
+    }
 }
 
 function loadConvertedMidi(blob, downloadName, title) {
@@ -1926,31 +1951,34 @@ window.onload = function () {
     noteColorInput.oninput = function () {
         setNoteColorFromHex(noteColorInput.value);
     };
-    MIDI.loadPlugin(function () {
-        //MIDI.Player.loadFile(song[0], MIDI.Player.start);
-        midiReady = true;
-        setMidiStatus("Ready", "status-ready");
-        updateUploadButton();
-        activeSongTitle.textContent = songTitleFromFile(controls.song);
-        loadMidiFile("./vendor/MIDI/midi/" + controls.song, false, {
-            storeAsSource: true,
-            sourceDownloadName: controls.song,
-            sourceTitle: songTitleFromFile(controls.song)
-        });
-    
-        MIDI.Player.addListener(function (data) {
-            var pianoKey = data.note - MIDI.pianoKeyOffset - 3;
-            if (data.message === 144) {
-                key_status("_" + pianoKey, keyState.note_on);
-            }
-            else {
-                key_status("_" + pianoKey, keyState.note_off);
-            }
-        });
-        setupPlaybackAnimation();
+    MIDI.loadPlugin({
+        instruments: presetSoundfontInstruments,
+        callback: function () {
+            //MIDI.Player.loadFile(song[0], MIDI.Player.start);
+            midiReady = true;
+            setMidiStatus("Ready", "status-ready");
+            updateUploadButton();
+            activeSongTitle.textContent = songTitleFromFile(controls.song);
+            loadMidiFile("./vendor/MIDI/midi/" + controls.song, false, {
+                storeAsSource: true,
+                sourceDownloadName: controls.song,
+                sourceTitle: songTitleFromFile(controls.song)
+            });
 
-        // Close the MIDI loader widget once the custom controls are ready.
-        MIDI.loader.stop();
+            MIDI.Player.addListener(function (data) {
+                var pianoKey = data.note - MIDI.pianoKeyOffset - 3;
+                if (data.message === 144) {
+                    key_status("_" + pianoKey, keyState.note_on);
+                }
+                else {
+                    key_status("_" + pianoKey, keyState.note_off);
+                }
+            });
+            setupPlaybackAnimation();
+
+            // Close the MIDI loader widget once the custom controls are ready.
+            MIDI.loader.stop();
+        }
     });
 };
     

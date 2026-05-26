@@ -149,15 +149,17 @@ Acceptance criteria:
 
 Goal: provide lightweight MIDI arrangement variants.
 
-Status: V1 done for Piano, Strings, and Soft Synth program presets. Bass +
-Melody Split remains future work because it needs deliberate channel and note
-event rewriting.
+Status: V1 done for Piano, Strings, and Soft Synth program presets, including
+browser preview with bundled preset soundfonts. Bass + Melody Split remains
+future work because it needs deliberate channel and note event rewriting.
 
 Implementation scope:
 
 - Keep the current Piano, Strings, and Soft Synth presets as simple General MIDI
   program variants.
 - Implement V1 presets with MIDI program changes only.
+- Keep browser playback soundfont support limited to the bundled preset
+  instruments.
 - Keep pitch-range or melody/bass splitting as a later preset after channel
   rewriting is explicitly designed.
 - Label the feature as presets or arrangement sketches, not full orchestration.
@@ -165,6 +167,7 @@ Implementation scope:
 Acceptance criteria:
 
 - Presets export valid MIDI files.
+- Presets can be previewed in the browser with bundled soundfonts.
 - Presets are reversible by returning to the original MIDI.
 - The UI makes clear that presets change playback/export mapping, not the source
   audio transcription model.

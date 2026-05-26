@@ -24,6 +24,8 @@ OMG Score is a browser-based piano workflow:
 - Play MIDI files in a 3D piano scene with animated keys.
 - Perform notes directly with mouse, touch, or keyboard input.
 - Download converted MIDI files from the browser after conversion.
+- Export simple General MIDI preset variants and preview bundled piano, strings,
+  and soft synth soundfonts in the browser.
 - Run the full stack locally through Docker without installing Node, Java,
   Maven, or FFmpeg on the host.
 
@@ -111,7 +113,7 @@ If conversion fails with a missing model error, confirm that
 - [x] Show keyboard mapping with note labels for the selected octave.
 - [x] Show Smart Score MIDI analysis for loaded and converted MIDI.
 - [x] Export source and conservatively cleaned MIDI variants.
-- [x] Export simple instrument preset MIDI variants.
+- [x] Export and preview simple instrument preset MIDI variants.
 - [x] Add playback timeline and seek controls.
 - [x] Run frontend and backend CI on GitHub Actions.
 - [x] Add progress tracking for long-running conversion jobs.
@@ -130,3 +132,9 @@ and pre-commit review checklist.
 - Maven
 - FFmpeg
 - Piano transcription ONNX model
+
+## Attribution
+
+Preset browser playback uses selected FluidR3 General MIDI soundfont assets from
+[`gleitz/midi-js-soundfonts`](https://github.com/gleitz/midi-js-soundfonts).
+See [`docs/ATTRIBUTIONS.md`](./docs/ATTRIBUTIONS.md).
