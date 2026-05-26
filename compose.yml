@@ -30,3 +30,15 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+  basic-pitch:
+    profiles:
+      - research
+    build:
+      context: .
+      dockerfile: experiments/basic-pitch/Dockerfile
+    volumes:
+      - ./.isolation/basic-pitch/input:/workspace/input
+      - ./.isolation/basic-pitch/output:/workspace/output
+      - ./.isolation/basic-pitch/cache:/workspace/cache
+    working_dir: /workspace

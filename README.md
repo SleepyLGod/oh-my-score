@@ -120,7 +120,7 @@ If conversion fails with a missing model error, confirm that
 - [x] Add progress tracking for long-running conversion jobs.
 - [x] Profile conversion time and reuse the ONNX transcription session.
 - [x] Document alternative transcription engine research.
-- [ ] Prototype Basic Pitch in a Docker-isolated backend path.
+- [x] Prototype Basic Pitch in a Docker-isolated research path.
 
 See [`docs/TODO.md`](./docs/TODO.md) for the detailed Smart Score roadmap.
 See [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) for the local verification

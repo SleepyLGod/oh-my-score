@@ -288,6 +288,10 @@ Status: research V1 done in
 The recommendation is to prototype Basic Pitch in Docker before any backend API
 or UI change. MT3 remains future research.
 
+Basic Pitch prototype status: V1 done under `experiments/basic-pitch/`. It is a
+Docker-only research worker, not a supported backend engine. A 1-second WAV
+smoke test generated a valid Standard MIDI file.
+
 Implementation scope:
 
 - Research Basic Pitch as an optional engine.
@@ -303,7 +307,7 @@ Acceptance criteria:
 
 ## Near-Term Recommended Order
 
-1. Prototype Basic Pitch in a Docker-isolated path and compare it against the
-   current piano ONNX engine.
-2. Add an explicit backend engine selector only after the prototype has timing
+1. Compare Basic Pitch output quality against the current piano ONNX engine with
+   a small shared sample set.
+2. Add an explicit backend engine selector only after the comparison has timing
    and quality evidence.
