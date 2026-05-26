@@ -283,6 +283,11 @@ Acceptance criteria:
 
 Goal: evaluate whether another model improves useful output.
 
+Status: research V1 done in
+[`docs/research/transcription-engines.md`](./research/transcription-engines.md).
+The recommendation is to prototype Basic Pitch in Docker before any backend API
+or UI change. MT3 remains future research.
+
 Implementation scope:
 
 - Research Basic Pitch as an optional engine.
@@ -298,5 +303,7 @@ Acceptance criteria:
 
 ## Near-Term Recommended Order
 
-1. Add Bass + Melody Split after MIDI channel rewriting is explicit.
-2. Revisit alternative transcription engines.
+1. Prototype Basic Pitch in a Docker-isolated path and compare it against the
+   current piano ONNX engine.
+2. Add an explicit backend engine selector only after the prototype has timing
+   and quality evidence.
