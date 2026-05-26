@@ -442,6 +442,9 @@ kbd small {
     gap: 7px;
     margin-top: 14px;
 }
+.preset-field[hidden] {
+    display: none;
+}
 #cleanup-status,
 #preset-status {
     margin: 9px 0 0;

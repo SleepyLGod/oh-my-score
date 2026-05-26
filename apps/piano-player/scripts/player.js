@@ -66,6 +66,8 @@ var downloadCleanedMidiLink = document.getElementById("download-cleaned-midi-lin
 var loadCleanedMidiButton = document.getElementById("load-cleaned-midi-button");
 var cleanupStatus = document.getElementById("cleanup-status");
 var arrangementPresetSelect = document.getElementById("arrangement-preset");
+var melodySoundField = document.getElementById("melody-sound-field");
+var melodySoundSelect = document.getElementById("melody-sound");
 var createPresetMidiButton = document.getElementById("create-preset-midi-button");
 var downloadPresetMidiLink = document.getElementById("download-preset-midi-link");
 var loadPresetMidiButton = document.getElementById("load-preset-midi-button");
@@ -73,6 +75,8 @@ var presetStatus = document.getElementById("preset-status");
 var analysisRequestId = 0;
 var timelineDurationSeconds = 0;
 var activePlaybackProgram = 0;
+var activePlaybackPrograms = null;
+var presetPlaybackOptions = null;
 var isSeekingTimeline = false;
 var wasPlayingBeforeSeek = false;
 var playbackClockStartMs = 0;
@@ -83,12 +87,14 @@ var noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
 var arrangementPresets = {
     piano: { label: "Piano", program: 0, instrument: "acoustic_grand_piano" },
     strings: { label: "Strings", program: 48, instrument: "string_ensemble_1" },
-    "soft-synth": { label: "Soft Synth", program: 88, instrument: "pad_1_new_age" }
+    "soft-synth": { label: "Soft Synth", program: 88, instrument: "pad_1_new_age" },
+    "bass-melody": { label: "Bass + Melody", split: true, bassProgram: 32, bassInstrument: "acoustic_bass", splitPitch: 60 }
 };
 var presetSoundfontInstruments = [
     arrangementPresets.piano.instrument,
     arrangementPresets.strings.instrument,
-    arrangementPresets["soft-synth"].instrument
+    arrangementPresets["soft-synth"].instrument,
+    arrangementPresets["bass-melody"].bassInstrument
 ];
 var keyboardLayoutRows = [
     {
@@ -315,6 +321,7 @@ function resetPresetMidi(message) {
     presetMidiUrl = null;
     presetMidiBytes = null;
     presetCreatedLabel = "";
+    presetPlaybackOptions = null;
     downloadPresetMidiLink.hidden = true;
     downloadPresetMidiLink.removeAttribute("href");
     downloadPresetMidiLink.removeAttribute("download");
@@ -380,6 +387,22 @@ function presetDownloadName(preset) {
     return baseMidiFileName("-" + preset.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""));
 }
 
+function selectedMelodyPreset() {
+    return arrangementPresets[melodySoundSelect.value] || arrangementPresets.strings;
+}
+
+function selectedPresetLabel(preset) {
+    if (!preset.split) {
+        return preset.label;
+    }
+    return preset.label + " - " + selectedMelodyPreset().label;
+}
+
+function updatePresetFields() {
+    var preset = arrangementPresets[arrangementPresetSelect.value] || arrangementPresets.piano;
+    melodySoundField.hidden = !preset.split;
+}
+
 function analyzeMidiUrl(url, options) {
     options = options || {};
     var requestId = ++analysisRequestId;
@@ -431,6 +454,23 @@ function appendUint32(bytes, value) {
     bytes.push((value >>> 16) & 0xff);
     bytes.push((value >>> 8) & 0xff);
     bytes.push(value & 0xff);
+}
+
+function appendVarLength(bytes, value) {
+    var buffer = value & 0x7f;
+    while ((value = value >> 7)) {
+        buffer = buffer << 8;
+        buffer |= ((value & 0x7f) | 0x80);
+    }
+
+    while (true) {
+        bytes.push(buffer & 0xff);
+        if (buffer & 0x80) {
+            buffer = buffer >> 8;
+        } else {
+            break;
+        }
+    }
 }
 
 function bytesToText(bytes, offset, length) {
@@ -612,6 +652,20 @@ function pushActiveNote(activeNotes, key, note) {
         activeNotes[key] = [];
     }
     activeNotes[key].push(note);
+}
+
+function pushSplitChannel(activeNotes, key, channel) {
+    if (!activeNotes[key]) {
+        activeNotes[key] = [];
+    }
+    activeNotes[key].push(channel);
+}
+
+function popSplitChannel(activeNotes, key, fallbackChannel) {
+    if (!activeNotes[key] || !activeNotes[key].length) {
+        return fallbackChannel;
+    }
+    return activeNotes[key].pop();
 }
 
 function cleanMidiTrack(sourceBytes, cleanedBytes, start, end, division, stats) {
@@ -889,6 +943,162 @@ function createPresetMidiBytes(sourceBytes, presetProgram) {
     };
 }
 
+function bassMelodyTrackBytes(sourceBytes, start, end, options, stats) {
+    var output = [
+        0x00, 0xc0, options.melodyProgram,
+        0x00, 0xc1, options.bassProgram
+    ];
+    var state = { offset: start };
+    var runningStatus = null;
+    var activeSplitNotes = {};
+    var pendingDelta = 0;
+
+    function writeEvent(delta, eventBytes) {
+        appendVarLength(output, pendingDelta + delta);
+        pushBytes(output, eventBytes, 0, eventBytes.length);
+        pendingDelta = 0;
+    }
+
+    while (state.offset < end) {
+        var delta = readVarLength(sourceBytes, state, end);
+        if (state.offset >= end) break;
+
+        var status = sourceBytes[state.offset];
+        var dataOffset;
+        if (status < 0x80) {
+            if (runningStatus === null) {
+                throw new Error("MIDI running status found before status byte");
+            }
+            status = runningStatus;
+            dataOffset = state.offset;
+        } else {
+            state.offset += 1;
+            dataOffset = state.offset;
+            if (status < 0xf0) {
+                runningStatus = status;
+            }
+        }
+
+        if (status === 0xff) {
+            var metaType = sourceBytes[state.offset];
+            state.offset += 1;
+            var metaLength = readVarLength(sourceBytes, state, end);
+            var metaBytes = [0xff, metaType];
+            appendVarLength(metaBytes, metaLength);
+            pushBytes(metaBytes, sourceBytes, state.offset, state.offset + metaLength);
+            state.offset += metaLength;
+            writeEvent(delta, metaBytes);
+            continue;
+        }
+
+        if (status === 0xf0 || status === 0xf7) {
+            var sysexLength = readVarLength(sourceBytes, state, end);
+            var sysexBytes = [status];
+            appendVarLength(sysexBytes, sysexLength);
+            pushBytes(sysexBytes, sourceBytes, state.offset, state.offset + sysexLength);
+            state.offset += sysexLength;
+            writeEvent(delta, sysexBytes);
+            continue;
+        }
+
+        var dataLength = midiEventDataLength(status);
+        state.offset = dataOffset + dataLength;
+
+        var eventType = status & 0xf0;
+        var originalChannel = status & 0x0f;
+        var firstDataByte = sourceBytes[dataOffset];
+        var secondDataByte = dataLength > 1 ? sourceBytes[dataOffset + 1] : 0;
+        var splitKey = originalChannel + ":" + firstDataByte;
+
+        if (eventType === 0xc0) {
+            pendingDelta += delta;
+            stats.programChangesSkipped += 1;
+            continue;
+        }
+
+        if (eventType === 0x90 && secondDataByte > 0) {
+            var noteChannel = firstDataByte < options.splitPitch ? 1 : 0;
+            pushSplitChannel(activeSplitNotes, splitKey, noteChannel);
+            writeEvent(delta, [eventType + noteChannel, firstDataByte, secondDataByte]);
+            if (noteChannel === 1) {
+                stats.bassNotes += 1;
+            } else {
+                stats.melodyNotes += 1;
+            }
+            continue;
+        }
+
+        if (eventType === 0x80 || (eventType === 0x90 && secondDataByte === 0)) {
+            var fallbackChannel = firstDataByte < options.splitPitch ? 1 : 0;
+            var routedChannel = popSplitChannel(activeSplitNotes, splitKey, fallbackChannel);
+            writeEvent(delta, [eventType + routedChannel, firstDataByte, secondDataByte]);
+            continue;
+        }
+
+        if (eventType === 0xb0 && dataLength === 2) {
+            writeEvent(delta, [0xb0, firstDataByte, secondDataByte]);
+            writeEvent(0, [0xb1, firstDataByte, secondDataByte]);
+            stats.controlsDuplicated += 1;
+            continue;
+        }
+
+        var eventBytes = [status];
+        pushBytes(eventBytes, sourceBytes, dataOffset, dataOffset + dataLength);
+        writeEvent(delta, eventBytes);
+    }
+
+    return output;
+}
+
+function createBassMelodyMidiBytes(sourceBytes, melodyProgram) {
+    if (bytesToText(sourceBytes, 0, 4) !== "MThd") {
+        throw new Error("Invalid MIDI header");
+    }
+
+    var bassPreset = arrangementPresets["bass-melody"];
+    var headerLength = readUint32(sourceBytes, 4);
+    var offset = 8 + headerLength;
+    var output = [];
+    var stats = {
+        melodyNotes: 0,
+        bassNotes: 0,
+        programChangesSkipped: 0,
+        controlsDuplicated: 0
+    };
+    var options = {
+        melodyProgram: melodyProgram,
+        bassProgram: bassPreset.bassProgram,
+        splitPitch: bassPreset.splitPitch
+    };
+    pushBytes(output, sourceBytes, 0, offset);
+
+    while (offset + 8 <= sourceBytes.length) {
+        var chunkType = bytesToText(sourceBytes, offset, 4);
+        var chunkLength = readUint32(sourceBytes, offset + 4);
+        var chunkStart = offset + 8;
+        var chunkEnd = chunkStart + chunkLength;
+        if (chunkEnd > sourceBytes.length) {
+            throw new Error("MIDI track chunk exceeds file length");
+        }
+
+        pushBytes(output, sourceBytes, offset, offset + 4);
+        if (chunkType === "MTrk") {
+            var trackBytes = bassMelodyTrackBytes(sourceBytes, chunkStart, chunkEnd, options, stats);
+            appendUint32(output, trackBytes.length);
+            pushBytes(output, trackBytes, 0, trackBytes.length);
+        } else {
+            appendUint32(output, chunkLength);
+            pushBytes(output, sourceBytes, chunkStart, chunkEnd);
+        }
+        offset = chunkEnd;
+    }
+
+    return {
+        bytes: new Uint8Array(output),
+        stats: stats
+    };
+}
+
 function cleanActiveMidi() {
     if (!activeMidiBytes) return;
 
@@ -915,20 +1125,33 @@ function createPresetMidi() {
     if (!activeMidiBytes) return;
 
     var preset = arrangementPresets[arrangementPresetSelect.value] || arrangementPresets.piano;
+    var melodyPreset = selectedMelodyPreset();
     try {
-        var presetResult = createPresetMidiBytes(activeMidiBytes, preset.program);
+        var presetResult = preset.split
+            ? createBassMelodyMidiBytes(activeMidiBytes, melodyPreset.program)
+            : createPresetMidiBytes(activeMidiBytes, preset.program);
+        var presetLabel = selectedPresetLabel(preset);
         resetPresetMidi();
         presetMidiBytes = new Uint8Array(presetResult.bytes);
-        presetCreatedLabel = preset.label;
+        presetCreatedLabel = presetLabel;
+        presetPlaybackOptions = preset.split
+            ? { playbackPrograms: { 0: melodyPreset.program, 1: preset.bassProgram } }
+            : { playbackProgram: preset.program };
         presetMidiUrl = URL.createObjectURL(new Blob([presetResult.bytes], { type: "audio/midi" }));
         downloadPresetMidiLink.href = presetMidiUrl;
         downloadPresetMidiLink.download = presetDownloadName(preset);
         downloadPresetMidiLink.hidden = false;
         loadPresetMidiButton.hidden = false;
-        presetStatus.textContent = preset.label + " preset ready: "
-            + presetResult.stats.programChangesInserted + " inserted, "
-            + presetResult.stats.programChangesRewritten + " rewritten. Browser playback uses the bundled "
-            + preset.label + " soundfont.";
+        if (preset.split) {
+            presetStatus.textContent = presetLabel + " ready: "
+                + presetResult.stats.bassNotes + " bass notes, "
+                + presetResult.stats.melodyNotes + " melody notes. Split point: C4.";
+        } else {
+            presetStatus.textContent = preset.label + " preset ready: "
+                + presetResult.stats.programChangesInserted + " inserted, "
+                + presetResult.stats.programChangesRewritten + " rewritten. Browser playback uses the bundled "
+                + preset.label + " soundfont.";
+        }
     } catch (error) {
         console.warn(error);
         resetPresetMidi("Preset unavailable for this MIDI file.");
@@ -939,15 +1162,16 @@ function currentVariantPreserveOptions() {
     return {
         preserveCleaned: !!cleanedMidiBytes,
         preservePreset: !!presetMidiBytes,
-        playbackProgram: activePlaybackProgram
+        playbackProgram: activePlaybackProgram,
+        playbackPrograms: activePlaybackPrograms
     };
 }
 
 function loadPresetMidi() {
     if (!presetMidiBytes || !midiReady) return;
 
-    var preset = arrangementPresets[arrangementPresetSelect.value] || arrangementPresets.piano;
-    var presetLabel = presetCreatedLabel || preset.label;
+    var fallbackPreset = arrangementPresets[arrangementPresetSelect.value] || arrangementPresets.piano;
+    var presetLabel = presetCreatedLabel || fallbackPreset.label;
     if (presetPlaybackUrl && presetPlaybackUrl !== activeMidiUrl && presetPlaybackUrl.indexOf("blob:") === 0) {
         URL.revokeObjectURL(presetPlaybackUrl);
     }
@@ -955,10 +1179,12 @@ function loadPresetMidi() {
     activeSongTitle.textContent = (sourceMidiTitle || activeSongTitle.textContent || "Score") + " (Preset: " + presetLabel + ")";
     setUploadStatus(presetLabel + " preset variant loaded");
     presetStatus.textContent = presetLabel + " preset variant loaded with bundled browser soundfont. Source MIDI stays unchanged.";
+    var playbackOptions = presetPlaybackOptions || { playbackProgram: fallbackPreset.program };
     loadMidiFile(presetPlaybackUrl, false, {
         preserveCleaned: true,
         preservePreset: true,
-        playbackProgram: preset.program
+        playbackProgram: playbackOptions.playbackProgram,
+        playbackPrograms: playbackOptions.playbackPrograms
     });
 }
 
@@ -975,7 +1201,8 @@ function loadCleanedMidi() {
     loadMidiFile(cleanedPlaybackUrl, false, {
         preserveCleaned: true,
         preservePreset: !!presetMidiBytes,
-        playbackProgram: activePlaybackProgram
+        playbackProgram: activePlaybackProgram,
+        playbackPrograms: activePlaybackPrograms
     });
 }
 
@@ -1087,7 +1314,11 @@ function loadMidiFile(url, start, options) {
     activeMidiUrl = url;
     analyzeMidiUrl(url, options);
     MIDI.Player.stop();
-    setPlaybackProgram(typeof options.playbackProgram === "number" ? options.playbackProgram : arrangementPresets.piano.program);
+    if (options.playbackPrograms) {
+        setPlaybackPrograms(options.playbackPrograms);
+    } else {
+        setPlaybackProgram(typeof options.playbackProgram === "number" ? options.playbackProgram : arrangementPresets.piano.program);
+    }
     syncPlayerSeekTime(0);
     releaseKeyboardNotes();
     playbackClockStartMs = 0;
@@ -1107,12 +1338,30 @@ function loadMidiFile(url, start, options) {
 
 function setPlaybackProgram(program) {
     activePlaybackProgram = program;
+    activePlaybackPrograms = null;
     if (!midiReady || !MIDI.programChange) return;
     for (var channel = 0; channel < 16; channel += 1) {
         if (channel !== 9) {
             MIDI.programChange(channel, program);
         }
     }
+}
+
+function setPlaybackPrograms(programs) {
+    activePlaybackPrograms = {};
+    Object.keys(programs).forEach(function (channel) {
+        activePlaybackPrograms[channel] = programs[channel];
+    });
+    activePlaybackProgram = typeof programs[0] === "number" ? programs[0] : arrangementPresets.piano.program;
+    if (!midiReady || !MIDI.programChange) return;
+    for (var channel = 0; channel < 16; channel += 1) {
+        if (channel !== 9) {
+            MIDI.programChange(channel, arrangementPresets.piano.program);
+        }
+    }
+    Object.keys(programs).forEach(function (channel) {
+        MIDI.programChange(parseInt(channel, 10), programs[channel]);
+    });
 }
 
 function loadConvertedMidi(blob, downloadName, title) {
@@ -1910,6 +2159,7 @@ renderer.domElement.addEventListener("touchcancel", onPianoTouchEnd, true);
 window.onload = function () {
     populateSongSelect();
     renderKeyboardMap();
+    updatePresetFields();
     songSelect.onchange = function () {
         controls.song = songSelect.value;
         activeSongTitle.textContent = songTitleFromFile(controls.song);
@@ -1928,6 +2178,13 @@ window.onload = function () {
     loadCleanedMidiButton.onclick = loadCleanedMidi;
     createPresetMidiButton.onclick = createPresetMidi;
     loadPresetMidiButton.onclick = loadPresetMidi;
+    arrangementPresetSelect.onchange = function () {
+        updatePresetFields();
+        resetPresetMidi();
+    };
+    melodySoundSelect.onchange = function () {
+        resetPresetMidi();
+    };
     timelineSlider.onpointerdown = beginTimelineSeek;
     timelineSlider.onkeydown = beginTimelineSeek;
     timelineSlider.oninput = previewTimelineSeek;

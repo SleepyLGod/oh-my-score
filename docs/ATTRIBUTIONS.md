@@ -6,6 +6,7 @@ OMG Score bundles selected General MIDI soundfont files for browser preset
 playback:
 
 - `string_ensemble_1`
+- `acoustic_bass`
 - `pad_1_new_age`
 
 These files are from the FluidR3 General MIDI set distributed by
