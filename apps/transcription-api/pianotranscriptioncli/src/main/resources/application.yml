@@ -5,6 +5,7 @@ omg:
   transcription:
     work-dir: ${OMG_TRANSCRIPTION_WORK_DIR:${user.dir}/runtime}
     model-path: ${OMG_TRANSCRIPTION_MODEL_PATH:${user.dir}/src/main/resources/transcription.onnx}
+    basic-pitch-url: ${OMG_TRANSCRIPTION_BASIC_PITCH_URL:http://basic-pitch-service:8090}
 
 spring:
   devtools:

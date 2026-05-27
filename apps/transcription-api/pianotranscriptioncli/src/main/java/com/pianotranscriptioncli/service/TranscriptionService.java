@@ -14,7 +14,7 @@ public interface TranscriptionService {
 
     Path AudioTOMidiUploadWithFile(MultipartFile file, String songName) throws Exception;
 
-    TranscriptionJobResponse createAudioToMidiJob(MultipartFile file, String songName) throws Exception;
+    TranscriptionJobResponse createAudioToMidiJob(MultipartFile file, String songName, String engine) throws Exception;
 
     TranscriptionJobResponse getTranscriptionJob(String id);
 

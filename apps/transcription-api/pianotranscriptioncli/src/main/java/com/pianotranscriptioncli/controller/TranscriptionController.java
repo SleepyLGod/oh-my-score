@@ -60,8 +60,9 @@ public class TranscriptionController {
     @ResponseBody
     @PostMapping(value = "/jobs", consumes = {"multipart/form-data"})
     public TranscriptionJobResponse createJob(@RequestParam("file") MultipartFile file,
-                                              @RequestParam("songName") String songName) throws Exception {
-        return transcriptionService.createAudioToMidiJob(file, songName);
+                                              @RequestParam("songName") String songName,
+                                              @RequestParam(value = "engine", required = false) String engine) throws Exception {
+        return transcriptionService.createAudioToMidiJob(file, songName, engine);
     }
 
     @GetMapping(value = "/jobs/{id}")

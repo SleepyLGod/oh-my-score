@@ -9,17 +9,22 @@ public class TranscriptionJobResponse {
     private String status;
     private String message;
     private String downloadUrl;
+    private String engine;
+    private String engineLabel;
     @JsonIgnore
     private Path midiPath;
 
     public TranscriptionJobResponse() {
     }
 
-    public TranscriptionJobResponse(String id, String status, String message, String downloadUrl, Path midiPath) {
+    public TranscriptionJobResponse(String id, String status, String message, String downloadUrl, String engine,
+                                    String engineLabel, Path midiPath) {
         this.id = id;
         this.status = status;
         this.message = message;
         this.downloadUrl = downloadUrl;
+        this.engine = engine;
+        this.engineLabel = engineLabel;
         this.midiPath = midiPath;
     }
 
@@ -53,6 +58,22 @@ public class TranscriptionJobResponse {
 
     public void setDownloadUrl(String downloadUrl) {
         this.downloadUrl = downloadUrl;
+    }
+
+    public String getEngine() {
+        return engine;
+    }
+
+    public void setEngine(String engine) {
+        this.engine = engine;
+    }
+
+    public String getEngineLabel() {
+        return engineLabel;
+    }
+
+    public void setEngineLabel(String engineLabel) {
+        this.engineLabel = engineLabel;
     }
 
     public Path getMidiPath() {

@@ -119,8 +119,8 @@ Risks:
 
 ## Engine Selector Direction
 
-Do not replace the current engine silently. If Basic Pitch proves useful, add a
-small backend engine selector with these product boundaries:
+Do not replace the current engine silently. The V1 product integration follows
+that rule with an explicit backend engine selector and compare mode:
 
 - Default stays as the current piano ONNX engine.
 - Basic Pitch is labeled as experimental/general audio.

@@ -16,6 +16,7 @@ var cleanedMidiBytes = null;
 var presetMidiBytes = null;
 var sourceMidiDownloadUrl = null;
 var sourceMidiTitle = "";
+var sourceAudioUrl = null;
 var presetCreatedLabel = "";
 var midiReady = false;
 var loopEnabled = false;
@@ -29,6 +30,11 @@ var conversionResultText = document.getElementById("conversion-result-text");
 var downloadMidiLink = document.getElementById("download-midi-link");
 var retryConvertButton = document.getElementById("retry-convert-button");
 var fileName = document.getElementById("file-name");
+var sourceAudioPreview = document.getElementById("source-audio-preview");
+var sourceAudioPlayer = document.getElementById("source-audio-player");
+var conversionModeInputs = Array.prototype.slice.call(document.querySelectorAll('input[name="conversion-mode"]'));
+var compareResultsPanel = document.getElementById("compare-results");
+var compareCards = Array.prototype.slice.call(document.querySelectorAll(".compare-card"));
 var midiFileName = document.getElementById("midi-file-name");
 var midiStatus = document.getElementById("midi-status");
 var midiStatusText = document.getElementById("midi-status-text");
@@ -84,6 +90,11 @@ var playbackClockBaseSeconds = 0;
 var conversionPollDelayMs = 1200;
 var maxConversionPollAttempts = 500;
 var noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+var conversionEngines = {
+    "piano-onnx": { label: "Piano ONNX", description: "Piano-focused baseline" },
+    "basic-pitch": { label: "Basic Pitch", description: "Experimental general audio" }
+};
+var compareResults = {};
 var arrangementPresets = {
     piano: { label: "Piano", program: 0, instrument: "acoustic_grand_piano" },
     strings: { label: "Strings", program: 48, instrument: "string_ensemble_1" },
@@ -185,6 +196,107 @@ function showConversionResult(downloadName, blob) {
     downloadMidiLink.download = downloadName;
 }
 
+function currentConversionMode() {
+    var selected = conversionModeInputs.find(function (input) {
+        return input.checked;
+    });
+    return selected ? selected.value : "piano-onnx";
+}
+
+function createConversionFormData(file, songName, engine) {
+    var formData = new FormData();
+    formData.append("file", file);
+    formData.append("songName", songName);
+    if (engine) {
+        formData.append("engine", engine);
+    }
+    return formData;
+}
+
+function setSourceAudioPreview(file) {
+    if (sourceAudioUrl) {
+        URL.revokeObjectURL(sourceAudioUrl);
+        sourceAudioUrl = null;
+    }
+    if (!file) {
+        sourceAudioPreview.hidden = true;
+        sourceAudioPlayer.removeAttribute("src");
+        sourceAudioPlayer.load();
+        return;
+    }
+    sourceAudioUrl = URL.createObjectURL(file);
+    sourceAudioPlayer.src = sourceAudioUrl;
+    sourceAudioPreview.hidden = false;
+}
+
+function resetCompareResults() {
+    Object.keys(compareResults).forEach(function (engine) {
+        if (compareResults[engine].url) {
+            URL.revokeObjectURL(compareResults[engine].url);
+        }
+    });
+    compareResults = {};
+    compareCards.forEach(function (card) {
+        var status = card.querySelector(".compare-status");
+        var meta = card.querySelector(".compare-meta");
+        var loadButton = card.querySelector(".compare-load-button");
+        var downloadLink = card.querySelector(".compare-download-link");
+        var engine = card.getAttribute("data-engine");
+        status.textContent = "Waiting";
+        meta.textContent = conversionEngines[engine].description;
+        loadButton.hidden = true;
+        downloadLink.hidden = true;
+        downloadLink.removeAttribute("href");
+        downloadLink.removeAttribute("download");
+    });
+}
+
+function hideCompareResults() {
+    compareResultsPanel.hidden = true;
+    resetCompareResults();
+}
+
+function showCompareResults() {
+    compareResultsPanel.hidden = false;
+    resetCompareResults();
+}
+
+function updateCompareCard(engine, statusText, metaText) {
+    var card = compareCards.find(function (candidate) {
+        return candidate.getAttribute("data-engine") === engine;
+    });
+    if (!card) return;
+    card.querySelector(".compare-status").textContent = statusText;
+    if (metaText) {
+        card.querySelector(".compare-meta").textContent = metaText;
+    }
+}
+
+function showCompareResult(engine, job, blob, songName) {
+    var card = compareCards.find(function (candidate) {
+        return candidate.getAttribute("data-engine") === engine;
+    });
+    if (!card) return;
+    var engineLabel = job.engineLabel || conversionEngines[engine].label;
+    var downloadName = songName + "-" + engine + ".mid";
+    var url = URL.createObjectURL(blob);
+    compareResults[engine] = {
+        blob: blob,
+        url: url,
+        downloadName: downloadName,
+        title: songName + " · " + engineLabel
+    };
+
+    var elapsed = conversionElapsedText(job);
+    updateCompareCard(engine, "Ready", elapsed ? "Converted in " + elapsed : "Converted · " + formatBytes(blob.size));
+    var loadButton = card.querySelector(".compare-load-button");
+    var downloadLink = card.querySelector(".compare-download-link");
+    loadButton.hidden = false;
+    downloadLink.hidden = false;
+    downloadLink.href = url;
+    downloadLink.download = downloadName;
+}
+
 function setMidiStatus(message, statusClass) {
     midiStatus.className = "status-pill" + (statusClass ? " " + statusClass : "");
     midiStatusText.textContent = message;
@@ -192,6 +304,7 @@ function setMidiStatus(message, statusClass) {
 
 function updateUploadButton() {
     convertButton.disabled = !midiReady || !uploadFileInput.files.length;
+    convertButton.textContent = currentConversionMode() === "compare" ? "Compare Engines" : "Convert to MIDI";
 }
 
 function songNameFromFile(file) {
@@ -1575,14 +1688,28 @@ function loadConvertedMidiFromJob(job, songName) {
         return response.blob();
     }).then(function (blob) {
         var downloadName = downloadNameFromSongName(songName);
-        loadConvertedMidi(blob, downloadName, songName);
+        var title = job.engineLabel ? songName + " · " + job.engineLabel : songName;
+        loadConvertedMidi(blob, downloadName, title);
         setUploadStatus(conversionLoadedStatusMessage(job));
         showConversionResult(downloadName, blob);
-        activeSongTitle.textContent = songName;
+        activeSongTitle.textContent = title;
     });
 }
 
-function pollConversionJob(jobUrl, songName, attempt) {
+function fetchConvertedMidiBlob(job) {
+    var downloadUrl = resolveJobUrl(job.downloadUrl);
+    if (!downloadUrl) {
+        return Promise.reject(new Error("Conversion job did not provide a MIDI download URL."));
+    }
+    return fetch(downloadUrl).then(function (response) {
+        if (!response.ok) {
+            return responseError(response);
+        }
+        return response.blob();
+    });
+}
+
+function pollConversionJobStatus(jobUrl, onUpdate, attempt) {
     attempt = attempt || 1;
     if (attempt > maxConversionPollAttempts) {
         return Promise.reject(new Error("Conversion polling timed out. Retry the conversion or check Docker logs."));
@@ -1594,24 +1721,33 @@ function pollConversionJob(jobUrl, songName, attempt) {
         return response.json();
     }).then(function (job) {
         if (job.status === "succeeded") {
-            setUploadStatus(conversionSucceededLoadingMessage(job));
-            return loadConvertedMidiFromJob(job, songName);
+            return job;
         }
-        setUploadStatus(conversionJobStatusMessage(job));
+        if (onUpdate) {
+            onUpdate(job);
+        }
         if (job.status === "failed") {
             throw new Error(job.message || "Backend conversion failed.");
         }
         return waitForConversionPoll().then(function () {
-            return pollConversionJob(jobUrl, songName, attempt + 1);
+            return pollConversionJobStatus(jobUrl, onUpdate, attempt + 1);
         });
     });
 }
 
-function runAsyncConversion(formData, songName) {
+function pollConversionJob(jobUrl, songName) {
+    return pollConversionJobStatus(jobUrl, function (job) {
+        setUploadStatus(conversionJobStatusMessage(job));
+    }).then(function (job) {
+        setUploadStatus(conversionSucceededLoadingMessage(job));
+        return loadConvertedMidiFromJob(job, songName);
+    });
+}
+
+function createConversionJob(formData) {
     if (!transcriptionJobsApiUrl) {
         return Promise.reject(asyncEndpointUnavailableError());
     }
-    setUploadStatus("Queued conversion...");
     return fetch(transcriptionJobsApiUrl, {
         method: "POST",
         body: formData
@@ -1623,7 +1759,12 @@ function runAsyncConversion(formData, songName) {
             return responseError(response);
         }
         return response.json();
-    }).then(function (job) {
+    });
+}
+
+function runAsyncConversion(formData, songName) {
+    setUploadStatus("Queued conversion...");
+    return createConversionJob(formData).then(function (job) {
         if (!job || !job.id) {
             throw new Error("Conversion job response did not include a job id.");
         }
@@ -1632,6 +1773,51 @@ function runAsyncConversion(formData, songName) {
             throw new Error(job.message || "Backend conversion failed.");
         }
         return pollConversionJob(conversionJobUrl(job.id), songName);
+    });
+}
+
+function runCompareEngine(file, songName, engine) {
+    updateCompareCard(engine, "Queued", "Waiting for backend");
+    return createConversionJob(createConversionFormData(file, songName, engine)).then(function (job) {
+        if (!job || !job.id) {
+            throw new Error("Conversion job response did not include a job id.");
+        }
+        updateCompareCard(engine, conversionJobStatusMessage(job), job.engineLabel || conversionEngines[engine].label);
+        if (job.status === "failed") {
+            throw new Error(job.message || "Backend conversion failed.");
+        }
+        return pollConversionJobStatus(conversionJobUrl(job.id), function (updatedJob) {
+            updateCompareCard(engine, conversionJobStatusMessage(updatedJob), updatedJob.engineLabel || conversionEngines[engine].label);
+        });
+    }).then(function (job) {
+        updateCompareCard(engine, conversionSucceededLoadingMessage(job), job.engineLabel || conversionEngines[engine].label);
+        return fetchConvertedMidiBlob(job).then(function (blob) {
+            showCompareResult(engine, job, blob, songName);
+            return job;
+        });
+    }).catch(function (error) {
+        updateCompareCard(engine, "Failed", conversionErrorMessage(error));
+        throw error;
+    });
+}
+
+function runCompareConversion(file, songName) {
+    if (!transcriptionJobsApiUrl) {
+        return Promise.reject(new Error("Compare mode needs local Docker backend."));
+    }
+    showCompareResults();
+    setUploadStatus("Comparing engines...");
+    var engines = ["piano-onnx", "basic-pitch"];
+    return Promise.allSettled(engines.map(function (engine) {
+        return runCompareEngine(file, songName, engine);
+    })).then(function (results) {
+        var succeeded = results.filter(function (result) {
+            return result.status === "fulfilled";
+        }).length;
+        if (succeeded === 0) {
+            throw new Error("Both transcription engines failed.");
+        }
+        setUploadStatus("Compare ready. Load the MIDI version you prefer.");
     });
 }
 
@@ -1660,7 +1846,9 @@ function runSynchronousConversion(formData, songName) {
 uploadFileInput.onchange = function () {
     var file = uploadFileInput.files[0];
     fileName.textContent = file ? file.name : "No file selected";
+    setSourceAudioPreview(file || null);
     hideConversionResult();
+    hideCompareResults();
     setUploadStatus(file ? "Ready to convert" : "Waiting");
     updateUploadButton();
 };
@@ -1680,6 +1868,7 @@ midiFileInput.onchange = function () {
     }
     localMidiUrl = URL.createObjectURL(file);
     hideConversionResult();
+    hideCompareResults();
     setUploadStatus("Local MIDI loaded");
     activeSongTitle.textContent = songNameFromFile(file);
     loadMidiFile(localMidiUrl, true, {
@@ -1703,17 +1892,27 @@ convertButton.onclick = function () {
         return;
     }
 
-    var formData = new FormData();
-    formData.append("file", file);
     var songName = songNameFromFile(file);
-    formData.append("songName", songName);
+    var mode = currentConversionMode();
 
     convertButton.disabled = true;
     hideConversionResult();
-    runAsyncConversion(formData, songName).catch(function (error) {
+    if (mode === "compare") {
+        runCompareConversion(file, songName).catch(function (error) {
+            console.error(error);
+            setUploadStatus(conversionErrorMessage(error));
+        }).finally(updateUploadButton);
+        return;
+    }
+
+    hideCompareResults();
+    runAsyncConversion(createConversionFormData(file, songName, mode), songName).catch(function (error) {
         if (error && error.fallbackToSync) {
+            if (mode !== "piano-onnx") {
+                throw new Error("This engine needs the async Docker backend.");
+            }
             setUploadStatus("Async endpoint unavailable. Trying direct conversion.");
-            return runSynchronousConversion(formData, songName);
+            return runSynchronousConversion(createConversionFormData(file, songName, null), songName);
         }
         throw error;
     }).catch(function (error) {
@@ -1741,6 +1940,28 @@ function conversionErrorMessage(error) {
     }
     return message || "Conversion failed.";
 }
+
+conversionModeInputs.forEach(function (input) {
+    input.onchange = function () {
+        hideConversionResult();
+        hideCompareResults();
+        updateUploadButton();
+        setUploadStatus(uploadFileInput.files.length ? "Ready to convert" : "Waiting");
+    };
+});
+
+compareCards.forEach(function (card) {
+    var engine = card.getAttribute("data-engine");
+    var loadButton = card.querySelector(".compare-load-button");
+    loadButton.onclick = function () {
+        var result = compareResults[engine];
+        if (!result) return;
+        loadConvertedMidi(result.blob, result.downloadName, result.title);
+        showConversionResult(result.downloadName, result.blob);
+        setUploadStatus("Loaded " + conversionEngines[engine].label + " result");
+        activeSongTitle.textContent = result.title;
+    };
+});
     
 var scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x08090b, 12, 34);

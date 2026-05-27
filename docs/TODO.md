@@ -76,14 +76,16 @@ Playback and external editor import
 
 ### Backend Extension Path
 
-Keep the current piano transcription engine as the default backend path. If a
-second engine is added later, introduce an explicit engine selector instead of
-replacing the current path silently.
+Keep the current piano transcription engine as the default backend path. Basic
+Pitch is now available as an explicit alternate engine through the async job API,
+and compare mode lets users choose the output they prefer instead of replacing
+the current path silently.
 
-Possible future engines:
+Engine boundaries:
 
-- Basic Pitch: useful as an optional experiment for general audio-to-MIDI,
-  especially single-instrument or simpler audio.
+- Piano ONNX: default local piano transcription engine.
+- Basic Pitch: optional Docker-internal sidecar for experimental general
+  audio-to-MIDI conversion.
 - MT3-style models: research only. Multi-instrument transcription requires a
   larger model service, longer processing, and a clearer UI contract.
 
@@ -285,8 +287,8 @@ Goal: evaluate whether another model improves useful output.
 
 Status: research V1 done in
 [`docs/research/transcription-engines.md`](./research/transcription-engines.md).
-The recommendation is to prototype Basic Pitch in Docker before any backend API
-or UI change. MT3 remains future research.
+Basic Pitch is now promoted from research prototype to a Docker-internal sidecar
+engine. MT3 remains future research.
 
 Basic Pitch prototype status: V1 done under `experiments/basic-pitch/`. It is a
 Docker-only research worker, not a supported backend engine. A 1-second WAV
@@ -297,9 +299,14 @@ the current ONNX backend and Basic Pitch prototype with isolated samples,
 automatic MIDI metrics, and manual listening placeholders in a generated
 Markdown report.
 
+Engine selector status: V1 done. The async conversion API accepts `piano-onnx`
+or `basic-pitch`, and the frontend can run either single-engine conversion or a
+compare job that leaves the final choice to the user.
+
 Implementation scope:
 
-- Research Basic Pitch as an optional engine.
+- Keep Piano ONNX as the default engine.
+- Keep Basic Pitch available as an explicit, experimental engine.
 - Document deployment size, runtime cost, output quality, and supported formats.
 - Treat MT3-style multi-instrument transcription as a future research milestone.
 - Treat Strudel as a future creative-coding MIDI sketch direction, not an audio
@@ -316,7 +323,7 @@ Acceptance criteria:
 
 1. Run the engine comparison on 3-5 real short samples and fill in manual
    listening ratings.
-2. Add an explicit backend engine selector only if the comparison has timing and
-   quality evidence.
+2. Use real-sample results to decide whether Basic Pitch should stay
+   experimental, become a recommended option, or stay hidden in advanced flows.
 3. Research Strudel embedding separately as a code-to-music workflow after the
    transcription engine decision is clearer.

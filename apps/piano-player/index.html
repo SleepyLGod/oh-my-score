@@ -51,6 +51,27 @@
                         <span id="file-name">No file selected</span>
                     </div>
                 </div>
+                <div id="source-audio-preview" class="source-audio-preview" hidden>
+                    <span class="field-label">Original audio</span>
+                    <audio id="source-audio-player" controls preload="metadata"></audio>
+                </div>
+                <div class="field">
+                    <span class="field-label">Transcription engine</span>
+                    <div class="segmented-control" role="radiogroup" aria-label="Transcription engine">
+                        <label>
+                            <input type="radio" name="conversion-mode" value="piano-onnx" checked>
+                            <span>Piano ONNX</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="conversion-mode" value="basic-pitch">
+                            <span>Basic Pitch</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="conversion-mode" value="compare">
+                            <span>Compare</span>
+                        </label>
+                    </div>
+                </div>
                 <button id="convert-button" class="primary-button" type="button" disabled>Convert to MIDI</button>
                 <div class="field">
                     <span class="field-label">MIDI file</span>
@@ -72,6 +93,30 @@
                     <div class="result-actions">
                         <a id="download-midi-link" class="secondary-button" href="#" download>Download MIDI</a>
                         <button id="retry-convert-button" class="secondary-button" type="button">Retry</button>
+                    </div>
+                </div>
+                <div id="compare-results" class="compare-results" hidden>
+                    <div class="compare-card" data-engine="piano-onnx">
+                        <div>
+                            <span class="field-label">Piano ONNX</span>
+                            <strong class="compare-status">Waiting</strong>
+                        </div>
+                        <span class="compare-meta">Piano-focused baseline</span>
+                        <div class="compare-actions">
+                            <button class="secondary-button compare-load-button" type="button" hidden>Load</button>
+                            <a class="secondary-button compare-download-link" href="#" download hidden>Download</a>
+                        </div>
+                    </div>
+                    <div class="compare-card" data-engine="basic-pitch">
+                        <div>
+                            <span class="field-label">Basic Pitch</span>
+                            <strong class="compare-status">Waiting</strong>
+                        </div>
+                        <span class="compare-meta">Experimental general audio</span>
+                        <div class="compare-actions">
+                            <button class="secondary-button compare-load-button" type="button" hidden>Load</button>
+                            <a class="secondary-button compare-download-link" href="#" download hidden>Download</a>
+                        </div>
                     </div>
                 </div>
             </section>

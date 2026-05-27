@@ -7,6 +7,7 @@ services:
     environment:
       OMG_TRANSCRIPTION_MODEL_PATH: /workspace/.models/transcription.onnx
       OMG_TRANSCRIPTION_WORK_DIR: /workspace/.runtime
+      OMG_TRANSCRIPTION_BASIC_PITCH_URL: http://basic-pitch-service:8090
     ports:
       - "8084:8084"
     volumes:
@@ -17,6 +18,20 @@ services:
     working_dir: /workspace/apps/transcription-api
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8084/transcription/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  basic-pitch-service:
+    build:
+      context: .
+      dockerfile: apps/basic-pitch-service/Dockerfile
+    volumes:
+      - ./.isolation/backend-workspace:/workspace/.runtime
+      - ./.isolation/basic-pitch-service/cache:/workspace/cache
+    working_dir: /workspace
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=5).read()"]
       interval: 10s
       timeout: 5s
       retries: 12

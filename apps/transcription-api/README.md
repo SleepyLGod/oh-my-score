@@ -28,8 +28,9 @@ http://localhost:8084
 - `POST /transcription/audioToMidiWithFile` accepts `multipart/form-data` with
   an MP3 or WAV `file` field and returns a generated `.mid` file.
 - `POST /transcription/mp3ToMidiWithFile` remains as a compatibility alias.
-- `POST /transcription/jobs` accepts the same `multipart/form-data` fields and
-  returns a conversion job id, status, message, and MIDI download URL when ready.
+- `POST /transcription/jobs` accepts the same `multipart/form-data` fields plus
+  an optional `engine` field. Supported engines are `piano-onnx` and
+  `basic-pitch`; omitted values use `piano-onnx`.
 - `GET /transcription/jobs/{id}` returns `queued`, `running`, `succeeded`, or
   `failed` status for an async conversion job.
 - `GET /transcription/jobs/{id}/midi` downloads the generated MIDI once the job
@@ -42,6 +43,9 @@ The Docker setup passes these environment variables:
 - `OMG_TRANSCRIPTION_MODEL_PATH` points to the ONNX model file.
 - `OMG_TRANSCRIPTION_WORK_DIR` points to the runtime workspace for uploads,
   decoded audio, and generated MIDI files.
+- `OMG_TRANSCRIPTION_BASIC_PITCH_URL` points to the Docker-internal Basic Pitch
+  sidecar service for `basic-pitch` jobs.
 
 When running outside Docker, FFmpeg must be installed and available on `PATH`,
-and the model path must point to a valid `transcription.onnx` file.
+the model path must point to a valid `transcription.onnx` file, and Basic Pitch
+jobs require a reachable Basic Pitch sidecar service.

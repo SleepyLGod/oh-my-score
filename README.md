@@ -92,7 +92,9 @@ If conversion fails with a missing model error, confirm that
 - `POST /transcription/audioToMidiWithFile` accepts `multipart/form-data` with
   an MP3 or WAV `file` field and returns a generated `.mid` file.
 - `POST /transcription/mp3ToMidiWithFile` is kept as a compatibility alias.
-- `POST /transcription/jobs` starts an async MP3/WAV conversion job.
+- `POST /transcription/jobs` starts an async MP3/WAV conversion job. Optional
+  `engine` values are `piano-onnx` and `basic-pitch`; omitted values use
+  `piano-onnx`.
 - `GET /transcription/jobs/{id}` returns queued, running, succeeded, or failed
   status for a conversion job.
 - `GET /transcription/jobs/{id}/midi` downloads the generated MIDI for a
@@ -121,6 +123,8 @@ If conversion fails with a missing model error, confirm that
 - [x] Profile conversion time and reuse the ONNX transcription session.
 - [x] Document alternative transcription engine research.
 - [x] Prototype Basic Pitch in a Docker-isolated research path.
+- [x] Support selectable Piano ONNX and Basic Pitch conversion engines.
+- [x] Compare Piano ONNX and Basic Pitch outputs without auto-picking a winner.
 
 See [`docs/TODO.md`](./docs/TODO.md) for the detailed Smart Score roadmap.
 See [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) for the local verification
@@ -134,6 +138,7 @@ and pre-commit review checklist.
 - Maven
 - FFmpeg
 - Piano transcription ONNX model
+- Basic Pitch sidecar service
 
 ## Attribution
 

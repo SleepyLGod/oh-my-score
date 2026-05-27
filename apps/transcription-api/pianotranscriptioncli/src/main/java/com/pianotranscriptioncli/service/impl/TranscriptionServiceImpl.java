@@ -1,5 +1,6 @@
 package com.pianotranscriptioncli.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pianotranscriptioncli.common.api.CommonResult;
 import com.pianotranscriptioncli.dto.Mp3ImportDTO;
 import com.pianotranscriptioncli.dto.TranscriptionJobResponse;
@@ -13,9 +14,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.Locale;
 import java.util.UUID;
@@ -30,6 +37,8 @@ import java.util.stream.Stream;
 @Service
 public class TranscriptionServiceImpl implements TranscriptionService {
     private static final long JOB_RETENTION_MS = TimeUnit.HOURS.toMillis(24);
+    private static final String ENGINE_ONNX = "piano-onnx";
+    private static final String ENGINE_BASIC_PITCH = "basic-pitch";
 
     @Value("${omg.transcription.work-dir}")
     private String workDir;
@@ -37,7 +46,14 @@ public class TranscriptionServiceImpl implements TranscriptionService {
     @Value("${omg.transcription.model-path}")
     private String modelPath;
 
+    @Value("${omg.transcription.basic-pitch-url}")
+    private String basicPitchUrl;
+
     private final ConcurrentHashMap<String, TranscriptionJob> jobs = new ConcurrentHashMap<>();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final Object transcriptorLock = new Object();
     private final ExecutorService conversionExecutor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "omg-transcription-worker");
@@ -114,11 +130,12 @@ public class TranscriptionServiceImpl implements TranscriptionService {
     }
 
     @Override
-    public TranscriptionJobResponse createAudioToMidiJob(MultipartFile file, String songName) throws Exception {
+    public TranscriptionJobResponse createAudioToMidiJob(MultipartFile file, String songName, String engine) throws Exception {
         cleanupOldJobs();
+        String selectedEngine = normalizeEngine(engine);
         String jobId = UUID.randomUUID().toString();
         String safeSongName = sanitizeSongName(songName);
-        TranscriptionJob job = new TranscriptionJob(jobId);
+        TranscriptionJob job = new TranscriptionJob(jobId, selectedEngine);
         jobs.put(jobId, job);
 
         if (file.isEmpty()) {
@@ -137,6 +154,7 @@ public class TranscriptionServiceImpl implements TranscriptionService {
         Path jobDir = Path.of(workDir).resolve("jobs").resolve(jobId);
         Path tmpDir = jobDir.resolve("tmp");
         Files.createDirectories(jobDir);
+        allowSidecarWrite(jobDir);
         job.jobDir = jobDir;
         Path inputFile = jobDir.resolve("input." + extension);
         Path outputFile = jobDir.resolve(safeSongName + ".mid");
@@ -205,12 +223,13 @@ public class TranscriptionServiceImpl implements TranscriptionService {
 
     private void runConversionJob(TranscriptionJob job, Path tmpDir) {
         job.status = "running";
-        job.message = "Running conversion.";
+        job.message = "Running " + engineLabel(job.engine) + " conversion.";
         try {
-            Utils.ConversionResult result = convertSavedAudioToMidi(job.inputPath, job.outputPath, tmpDir, job.uploadStoreMs);
+            Utils.ConversionResult result = convertSavedAudioToMidi(job.inputPath, job.outputPath, tmpDir,
+                    job.uploadStoreMs, job.engine);
             job.outputPath = result.getOutputPath();
             job.status = "succeeded";
-            job.message = "Conversion succeeded in "
+            job.message = engineLabel(job.engine) + " conversion succeeded in "
                     + formatSeconds(job.uploadStoreMs + result.getTiming().getTotalMs()) + ".";
             job.completedAtMs = System.currentTimeMillis();
         } catch (Exception exception) {
@@ -220,17 +239,62 @@ public class TranscriptionServiceImpl implements TranscriptionService {
 
     private Utils.ConversionResult convertSavedAudioToMidi(Path inputFile, Path outputFile, Path tmpDir,
                                                            long uploadStoreMs) throws Exception {
-        Path model = Path.of(modelPath);
-        if (!Files.exists(model)) {
-            throw new FileNotFoundException("ONNX model not found: " + model);
+        return convertSavedAudioToMidi(inputFile, outputFile, tmpDir, uploadStoreMs, ENGINE_ONNX);
+    }
+
+    private Utils.ConversionResult convertSavedAudioToMidi(Path inputFile, Path outputFile, Path tmpDir,
+                                                           long uploadStoreMs, String engine) throws Exception {
+        Utils.ConversionResult result;
+        if (ENGINE_BASIC_PITCH.equals(engine)) {
+            result = convertWithBasicPitch(inputFile, outputFile);
+        } else {
+            result = convertWithOnnx(inputFile, outputFile, tmpDir);
         }
 
-        Utils.ConversionResult result = convertWithSharedTranscriptor(inputFile, outputFile, model, tmpDir);
         if (result.getOutputPath() == null) {
             throw new IOException("Audio conversion failed.");
         }
         System.out.println(result.getTiming().toLogLine(uploadStoreMs, inputFile, outputFile));
         return result;
+    }
+
+    private Utils.ConversionResult convertWithOnnx(Path inputFile, Path outputFile, Path tmpDir) throws Exception {
+        Path model = Path.of(modelPath);
+        if (!Files.exists(model)) {
+            throw new FileNotFoundException("ONNX model not found: " + model);
+        }
+
+        return convertWithSharedTranscriptor(inputFile, outputFile, model, tmpDir);
+    }
+
+    private Utils.ConversionResult convertWithBasicPitch(Path inputFile, Path outputFile) throws Exception {
+        long start = System.nanoTime();
+        Files.createDirectories(outputFile.getParent());
+        String body = objectMapper.writeValueAsString(
+                new BasicPitchRequest(inputFile.toString(), outputFile.toString()));
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(basicPitchConvertUri())
+                .timeout(Duration.ofMinutes(10))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+        HttpResponse<String> response;
+        try {
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (IOException exception) {
+            throw new IOException("Basic Pitch service unavailable. Start Docker sidecar and retry.", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Basic Pitch conversion was interrupted.", exception);
+        }
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new IOException("Basic Pitch conversion failed: " + response.body());
+        }
+        if (!Files.exists(outputFile)) {
+            throw new IOException("Basic Pitch finished without creating MIDI output.");
+        }
+        long totalMs = elapsedMs(start);
+        return new Utils.ConversionResult(outputFile, new Utils.ConversionTiming(0, 0, 0, totalMs, totalMs));
     }
 
     private Utils.ConversionResult convertWithSharedTranscriptor(Path inputFile, Path outputFile, Path model,
@@ -273,7 +337,8 @@ public class TranscriptionServiceImpl implements TranscriptionService {
     private TranscriptionJobResponse toResponse(TranscriptionJob job) {
         String downloadUrl = "succeeded".equals(job.status) ? "/transcription/jobs/" + job.id + "/midi" : null;
         Path midiPath = "succeeded".equals(job.status) ? job.outputPath : null;
-        return new TranscriptionJobResponse(job.id, job.status, job.message, downloadUrl, midiPath);
+        return new TranscriptionJobResponse(job.id, job.status, job.message, downloadUrl, job.engine,
+                engineLabel(job.engine), midiPath);
     }
 
     private String userFacingConversionMessage(Exception exception) {
@@ -290,6 +355,49 @@ public class TranscriptionServiceImpl implements TranscriptionService {
 
     private String formatSeconds(long milliseconds) {
         return String.format(Locale.ROOT, "%.2fs", milliseconds / 1000.0);
+    }
+
+    private String normalizeEngine(String engine) {
+        if (engine == null || engine.isBlank()) {
+            return ENGINE_ONNX;
+        }
+        String normalized = engine.strip().toLowerCase(Locale.ROOT);
+        if (normalized.equals(ENGINE_ONNX) || normalized.equals(ENGINE_BASIC_PITCH)) {
+            return normalized;
+        }
+        throw new IllegalArgumentException("Unsupported transcription engine: " + engine);
+    }
+
+    private String engineLabel(String engine) {
+        if (ENGINE_BASIC_PITCH.equals(engine)) {
+            return "Basic Pitch";
+        }
+        return "Piano ONNX";
+    }
+
+    private URI basicPitchConvertUri() {
+        if (basicPitchUrl == null || basicPitchUrl.isBlank()) {
+            throw new IllegalStateException("Basic Pitch service URL is not configured.");
+        }
+        URI baseUri;
+        try {
+            baseUri = URI.create(basicPitchUrl.replaceAll("/+$", ""));
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalStateException("Basic Pitch service URL is invalid: " + basicPitchUrl, exception);
+        }
+        if (baseUri.getScheme() == null || baseUri.getHost() == null) {
+            throw new IllegalStateException("Basic Pitch service URL must include scheme and host: " + basicPitchUrl);
+        }
+        return baseUri.resolve(baseUri.getPath().endsWith("/") ? "convert" : baseUri.getPath() + "/convert");
+    }
+
+    private void allowSidecarWrite(Path directory) {
+        try {
+            Files.setPosixFilePermissions(directory, PosixFilePermissions.fromString("rwxrwxrwx"));
+        } catch (UnsupportedOperationException | IOException exception) {
+            System.err.println("Failed to set sidecar write permissions on " + directory + ": "
+                    + exception.getMessage());
+        }
     }
 
     private void cleanupOldJobs() {
@@ -377,6 +485,7 @@ public class TranscriptionServiceImpl implements TranscriptionService {
 
     private static class TranscriptionJob {
         private final String id;
+        private final String engine;
         private volatile String status = "queued";
         private volatile String message = "Queued conversion.";
         private volatile Path inputPath;
@@ -385,8 +494,9 @@ public class TranscriptionServiceImpl implements TranscriptionService {
         private volatile Long completedAtMs;
         private volatile long uploadStoreMs;
 
-        private TranscriptionJob(String id) {
+        private TranscriptionJob(String id, String engine) {
             this.id = id;
+            this.engine = engine;
         }
 
         private void fail(String message) {
@@ -394,5 +504,8 @@ public class TranscriptionServiceImpl implements TranscriptionService {
             this.message = message;
             this.completedAtMs = System.currentTimeMillis();
         }
+    }
+
+    private record BasicPitchRequest(String inputPath, String outputPath) {
     }
 }
