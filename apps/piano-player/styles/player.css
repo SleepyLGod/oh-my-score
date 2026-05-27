@@ -368,9 +368,18 @@ select {
     color: var(--muted);
     font-size: 12px;
 }
+.compare-metrics {
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+.compare-metrics[hidden] {
+    display: none;
+}
 .compare-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
 }
 select,

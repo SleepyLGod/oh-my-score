@@ -82,6 +82,7 @@ var analysisRequestId = 0;
 var timelineDurationSeconds = 0;
 var activePlaybackProgram = 0;
 var activePlaybackPrograms = null;
+var activePlaybackIsPreview = false;
 var presetPlaybackOptions = null;
 var isSeekingTimeline = false;
 var wasPlayingBeforeSeek = false;
@@ -239,11 +240,16 @@ function resetCompareResults() {
     compareCards.forEach(function (card) {
         var status = card.querySelector(".compare-status");
         var meta = card.querySelector(".compare-meta");
+        var metrics = card.querySelector(".compare-metrics");
+        var previewButton = card.querySelector(".compare-preview-button");
         var loadButton = card.querySelector(".compare-load-button");
         var downloadLink = card.querySelector(".compare-download-link");
         var engine = card.getAttribute("data-engine");
         status.textContent = "Waiting";
         meta.textContent = conversionEngines[engine].description;
+        metrics.textContent = "Waiting for MIDI metrics";
+        metrics.hidden = true;
+        previewButton.hidden = true;
         loadButton.hidden = true;
         downloadLink.hidden = true;
         downloadLink.removeAttribute("href");
@@ -272,6 +278,14 @@ function updateCompareCard(engine, statusText, metaText) {
     }
 }
 
+function compareMetricsText(blob, summary) {
+    return formatDuration(summary.durationSeconds)
+        + " · " + formatCount(summary.noteCount, "note", "notes")
+        + " · " + summary.pitchRangeLabel
+        + " · poly " + summary.maxPolyphony
+        + " · " + formatBytes(blob.size);
+}
+
 function showCompareResult(engine, job, blob, songName) {
     var card = compareCards.find(function (candidate) {
         return candidate.getAttribute("data-engine") === engine;
@@ -289,8 +303,23 @@ function showCompareResult(engine, job, blob, songName) {
 
     var elapsed = conversionElapsedText(job);
     updateCompareCard(engine, "Ready", elapsed ? "Converted in " + elapsed : "Converted · " + formatBytes(blob.size));
+    var metrics = card.querySelector(".compare-metrics");
+    blob.arrayBuffer().then(function (arrayBuffer) {
+        if (!compareResults[engine] || compareResults[engine].blob !== blob) return;
+        var summary = parseMidiAnalysis(new Uint8Array(arrayBuffer));
+        compareResults[engine].summary = summary;
+        metrics.textContent = compareMetricsText(blob, summary);
+        metrics.hidden = false;
+    }).catch(function (error) {
+        if (!compareResults[engine] || compareResults[engine].blob !== blob) return;
+        console.warn(error);
+        metrics.textContent = "Analysis unavailable · " + formatBytes(blob.size);
+        metrics.hidden = false;
+    });
+    var previewButton = card.querySelector(".compare-preview-button");
     var loadButton = card.querySelector(".compare-load-button");
     var downloadLink = card.querySelector(".compare-download-link");
+    previewButton.hidden = false;
     loadButton.hidden = false;
     downloadLink.hidden = false;
     downloadLink.href = url;
@@ -1424,8 +1453,20 @@ function downloadNameFromSongName(songName) {
 
 function loadMidiFile(url, start, options) {
     options = options || {};
-    activeMidiUrl = url;
+    activePlaybackIsPreview = false;
     analyzeMidiUrl(url, options);
+    loadMidiPlayback(url, start, options);
+}
+
+function loadMidiPreview(url, start, options) {
+    options = options || {};
+    activePlaybackIsPreview = true;
+    loadMidiPlayback(url, start, options);
+}
+
+function loadMidiPlayback(url, start, options) {
+    options = options || {};
+    activeMidiUrl = url;
     MIDI.Player.stop();
     if (options.playbackPrograms) {
         setPlaybackPrograms(options.playbackPrograms);
@@ -1477,12 +1518,13 @@ function setPlaybackPrograms(programs) {
     });
 }
 
-function loadConvertedMidi(blob, downloadName, title) {
+function loadConvertedMidi(blob, downloadName, title, options) {
+    options = options || {};
     if (convertedMidiUrl) {
         URL.revokeObjectURL(convertedMidiUrl);
     }
     convertedMidiUrl = URL.createObjectURL(blob);
-    loadMidiFile(convertedMidiUrl, true, {
+    loadMidiFile(convertedMidiUrl, options.start !== false, {
         storeAsSource: true,
         sourceDownloadName: downloadName,
         sourceTitle: title
@@ -1540,7 +1582,11 @@ function restartPlayback() {
     if (!activeMidiUrl || !midiReady) return;
     loopRestartQueued = false;
     updateTimelinePosition(0);
-    loadMidiFile(activeMidiUrl, true, currentVariantPreserveOptions());
+    if (activePlaybackIsPreview) {
+        loadMidiPreview(activeMidiUrl, true, currentVariantPreserveOptions());
+    } else {
+        loadMidiFile(activeMidiUrl, true, currentVariantPreserveOptions());
+    }
 }
 
 function setLoopEnabled(enabled) {
@@ -1817,7 +1863,7 @@ function runCompareConversion(file, songName) {
         if (succeeded === 0) {
             throw new Error("Both transcription engines failed.");
         }
-        setUploadStatus("Compare ready. Load the MIDI version you prefer.");
+        setUploadStatus("Compare ready. Preview or load the version you prefer.");
     });
 }
 
@@ -1952,13 +1998,21 @@ conversionModeInputs.forEach(function (input) {
 
 compareCards.forEach(function (card) {
     var engine = card.getAttribute("data-engine");
+    var previewButton = card.querySelector(".compare-preview-button");
     var loadButton = card.querySelector(".compare-load-button");
+    previewButton.onclick = function () {
+        var result = compareResults[engine];
+        if (!result) return;
+        loadMidiPreview(result.url, true, { playbackProgram: arrangementPresets.piano.program });
+        setUploadStatus("Previewing " + conversionEngines[engine].label + " result");
+        activeSongTitle.textContent = result.title;
+    };
     loadButton.onclick = function () {
         var result = compareResults[engine];
         if (!result) return;
-        loadConvertedMidi(result.blob, result.downloadName, result.title);
+        loadConvertedMidi(result.blob, result.downloadName, result.title, { start: false });
         showConversionResult(result.downloadName, result.blob);
-        setUploadStatus("Loaded " + conversionEngines[engine].label + " result");
+        setUploadStatus("Loaded " + conversionEngines[engine].label + " result as source");
         activeSongTitle.textContent = result.title;
     };
 });
