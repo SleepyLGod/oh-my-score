@@ -292,11 +292,18 @@ Basic Pitch prototype status: V1 done under `experiments/basic-pitch/`. It is a
 Docker-only research worker, not a supported backend engine. A 1-second WAV
 smoke test generated a valid Standard MIDI file.
 
+Engine comparison status: V1 done under `experiments/engine-eval/`. It compares
+the current ONNX backend and Basic Pitch prototype with isolated samples,
+automatic MIDI metrics, and manual listening placeholders in a generated
+Markdown report.
+
 Implementation scope:
 
 - Research Basic Pitch as an optional engine.
 - Document deployment size, runtime cost, output quality, and supported formats.
 - Treat MT3-style multi-instrument transcription as a future research milestone.
+- Treat Strudel as a future creative-coding MIDI sketch direction, not an audio
+  transcription engine.
 
 Acceptance criteria:
 
@@ -307,7 +314,9 @@ Acceptance criteria:
 
 ## Near-Term Recommended Order
 
-1. Compare Basic Pitch output quality against the current piano ONNX engine with
-   a small shared sample set.
-2. Add an explicit backend engine selector only after the comparison has timing
-   and quality evidence.
+1. Run the engine comparison on 3-5 real short samples and fill in manual
+   listening ratings.
+2. Add an explicit backend engine selector only if the comparison has timing and
+   quality evidence.
+3. Research Strudel embedding separately as a code-to-music workflow after the
+   transcription engine decision is clearer.
