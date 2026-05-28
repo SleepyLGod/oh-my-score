@@ -1,0 +1,15 @@
+{
+  "name": "omg-score-strudel-sketch",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Docker-isolated Strudel pattern to Standard MIDI feasibility spike for Oh-My-Score.",
+  "license": "MPL-2.0",
+  "scripts": {
+    "export": "node src/export-strudel-midi.mjs",
+    "inspect": "node src/inspect-midi.mjs"
+  },
+  "dependencies": {
+    "@strudel/core": "1.2.6"
+  }
+}

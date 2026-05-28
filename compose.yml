@@ -57,3 +57,14 @@ services:
       - ./.isolation/basic-pitch/output:/workspace/output
       - ./.isolation/basic-pitch/cache:/workspace/cache
     working_dir: /workspace
+
+  strudel-sketch:
+    profiles:
+      - research
+    build:
+      context: .
+      dockerfile: experiments/strudel-sketch/Dockerfile
+    volumes:
+      - ./.isolation/strudel-sketch/input:/workspace/input
+      - ./.isolation/strudel-sketch/output:/workspace/output
+    working_dir: /workspace/experiment

@@ -339,6 +339,8 @@ this backlog instead of being treated as the next required step:
    velocity range if users need more control over exported MIDI.
 3. Add a configurable Bass + Melody split point if arrangement sketches become
    a frequent workflow.
-4. Research Strudel embedding as a creative-coding or code-to-MIDI sketch mode.
+4. Productize Strudel sketches only if code-to-MIDI becomes a real workflow;
+   note that the isolated spike has already proved that fixed Strudel patterns
+   can export readable MIDI.
 5. Keep MT3-style multi-instrument transcription as future research until there
    is a reproducible Docker prototype and a clear UI contract.
