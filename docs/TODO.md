@@ -56,7 +56,7 @@ The next layer should operate on MIDI data, regardless of whether it came from a
 user upload or from audio transcription. This keeps the first Smart Score
 features deterministic, testable, and useful without introducing a new model.
 
-Recommended flow:
+MIDI-first flow:
 
 ```text
 Audio upload or local MIDI
@@ -326,13 +326,19 @@ Acceptance criteria:
 - No new engine is merged without a Docker-isolated runtime path.
 - The UI never implies arbitrary-song multi-instrument transcription is supported
   until the backend and export path actually prove it.
-- Research output includes a go/no-go recommendation before implementation.
+- Research output documents integration risk before a new engine is implemented.
 
-## Near-Term Recommended Order
+## Optional Backlog
 
-1. Run the engine comparison on 3-5 real short samples and fill in manual
-   listening ratings.
-2. Use real-sample results to decide whether Basic Pitch should stay
-   experimental, become a recommended option, or stay hidden in advanced flows.
-3. Research Strudel embedding separately as a code-to-music workflow after the
-   transcription engine decision is clearer.
+The main V1 workflow is complete. Future work should be picked deliberately from
+this backlog instead of being treated as the next required step:
+
+1. Add loop ranges or a bar/beat grid if timeline review becomes the main pain
+   point.
+2. Add cleanup controls for short-note threshold, duplicate strictness, and
+   velocity range if users need more control over exported MIDI.
+3. Add a configurable Bass + Melody split point if arrangement sketches become
+   a frequent workflow.
+4. Research Strudel embedding as a creative-coding or code-to-MIDI sketch mode.
+5. Keep MT3-style multi-instrument transcription as future research until there
+   is a reproducible Docker prototype and a clear UI contract.

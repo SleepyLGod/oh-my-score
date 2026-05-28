@@ -55,7 +55,7 @@ The Pages workflow publishes [`apps/piano-player`](./apps/piano-player/).
 
 ## Isolated Local Run
 
-This is the recommended development path. Runtime caches, the ONNX model, and
+This is the preferred development path. Runtime caches, the ONNX model, and
 generated files stay under `.isolation/`.
 
 ```bash
@@ -124,7 +124,10 @@ If conversion fails with a missing model error, confirm that
 - [x] Document alternative transcription engine research.
 - [x] Prototype Basic Pitch in a Docker-isolated research path.
 - [x] Support selectable Piano ONNX and Basic Pitch conversion engines.
-- [x] Compare Piano ONNX and Basic Pitch outputs without auto-picking a winner.
+- [x] Compare Piano ONNX and Basic Pitch outputs for user audition.
+
+Compare mode is for listening and inspection; OMG Score does not rank engines
+or select a result automatically.
 
 See [`docs/TODO.md`](./docs/TODO.md) for the detailed Smart Score roadmap.
 See [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) for the local verification

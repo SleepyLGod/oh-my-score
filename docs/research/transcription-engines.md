@@ -3,19 +3,19 @@
 Checked on 2026-05-26.
 
 OMG Score currently uses the Java ONNX piano transcription path as its default
-backend engine. The next product question is whether to add a second engine for
-better audio-to-MIDI quality or broader instrument coverage. This document is a
-research checkpoint, not a statement of currently supported product behavior.
+backend engine. This research checkpoint records why a second, explicit engine
+path was worth prototyping and how future engines should be evaluated without
+silently replacing the default workflow.
 
-## Recommendation
+## Prototype Decision
 
 Decision: **go** for a Docker-isolated Basic Pitch prototype.
 
-Basic Pitch is the best next experiment because it already exposes a Python CLI,
-produces MIDI, supports common audio formats, and has a small enough integration
-surface to test without changing the current API. It should be added as an
-optional prototype engine first, not as a replacement for the existing piano
-engine.
+Basic Pitch is the lowest-risk next experiment because it already exposes a
+Python CLI, produces MIDI, supports common audio formats, and has a small enough
+integration surface to test without changing the current API. It should be added
+as an optional prototype engine first, not as a replacement for the existing
+piano engine.
 
 MT3 should stay in research. It is closer to the long-term multi-instrument goal,
 but its T5X-based workflow, checkpoint handling, and Colab-oriented usage make it
@@ -42,8 +42,8 @@ Limits:
   multi-instrument transcription.
 - Model quality and instrument coverage are bounded by the existing
   `transcription.onnx` engine.
-- There is no explicit engine selector yet, so a second engine should be added
-  behind a small backend abstraction before it reaches the UI.
+- The current selector covers Piano ONNX and Basic Pitch only; future engines
+  should reuse the same explicit job contract instead of replacing defaults.
 
 ## Candidate: Basic Pitch
 
@@ -78,7 +78,7 @@ Risks:
   reloading the model in a loop. A production version should mirror the existing
   ONNX session reuse discipline.
 
-Recommended prototype:
+Prototype checklist:
 
 - Build a temporary Docker-only Basic Pitch worker.
 - Mount the same isolated work directory used by backend jobs.
@@ -103,7 +103,7 @@ Fit for OMG Score:
 - Product fit: future research only. It needs a clearer contract for instrument
   classes, channels, confidence, latency, failure modes, and UI presentation.
 - Smart Score reuse: partial. If it outputs MIDI or note events, analysis and
-  playback can be reused, but multi-track output needs better channel/program
+  playback can be reused, but multi-track output needs richer channel/program
   interpretation than the current UI exposes.
 - Engine selector fit: not yet. It should not be wired into the backend until a
   reproducible container path and sample quality comparison exist.
@@ -124,7 +124,7 @@ that rule with an explicit backend engine selector and compare mode:
 
 - Default stays as the current piano ONNX engine.
 - Basic Pitch is labeled as experimental/general audio.
-- MT3 remains hidden until a reproducible Docker prototype exists.
+- MT3 remains research-only until a reproducible Docker prototype exists.
 - All engines must return a MIDI file that can pass through the existing Smart
   Score pipeline.
 - Engine-specific quality claims must be backed by sample conversions and timing
