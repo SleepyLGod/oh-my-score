@@ -34,6 +34,7 @@ var sourceAudioPreview = document.getElementById("source-audio-preview");
 var sourceAudioPlayer = document.getElementById("source-audio-player");
 var conversionModeInputs = Array.prototype.slice.call(document.querySelectorAll('input[name="conversion-mode"]'));
 var compareResultsPanel = document.getElementById("compare-results");
+var clearCompareResultsButton = document.getElementById("clear-compare-results-button");
 var compareCards = Array.prototype.slice.call(document.querySelectorAll(".compare-card"));
 var midiFileName = document.getElementById("midi-file-name");
 var midiStatus = document.getElementById("midi-status");
@@ -83,6 +84,7 @@ var timelineDurationSeconds = 0;
 var activePlaybackProgram = 0;
 var activePlaybackPrograms = null;
 var activePlaybackIsPreview = false;
+var previewRestoreState = null;
 var presetPlaybackOptions = null;
 var isSeekingTimeline = false;
 var wasPlayingBeforeSeek = false;
@@ -197,6 +199,12 @@ function showConversionResult(downloadName, blob) {
     downloadMidiLink.download = downloadName;
 }
 
+function revokeObjectUrl(url) {
+    if (url && url.indexOf("blob:") === 0) {
+        URL.revokeObjectURL(url);
+    }
+}
+
 function currentConversionMode() {
     var selected = conversionModeInputs.find(function (input) {
         return input.checked;
@@ -216,7 +224,7 @@ function createConversionFormData(file, songName, engine) {
 
 function setSourceAudioPreview(file) {
     if (sourceAudioUrl) {
-        URL.revokeObjectURL(sourceAudioUrl);
+        revokeObjectUrl(sourceAudioUrl);
         sourceAudioUrl = null;
     }
     if (!file) {
@@ -230,12 +238,41 @@ function setSourceAudioPreview(file) {
     sourceAudioPreview.hidden = false;
 }
 
-function resetCompareResults() {
-    Object.keys(compareResults).forEach(function (engine) {
-        if (compareResults[engine].url) {
-            URL.revokeObjectURL(compareResults[engine].url);
-        }
+function compareResultUsesActivePreview() {
+    if (!activePlaybackIsPreview || !activeMidiUrl) return false;
+    return Object.keys(compareResults).some(function (engine) {
+        return compareResults[engine].url === activeMidiUrl;
     });
+}
+
+function restorePlaybackAfterPreview() {
+    if (!compareResultUsesActivePreview()) return;
+    if (previewRestoreState && previewRestoreState.url) {
+        var restoreState = previewRestoreState;
+        previewRestoreState = null;
+        activePlaybackIsPreview = false;
+        activeSongTitle.textContent = restoreState.title || activeSongTitle.textContent;
+        loadMidiPlayback(restoreState.url, false, {
+            playbackProgram: restoreState.playbackProgram,
+            playbackPrograms: restoreState.playbackPrograms
+        });
+        return;
+    }
+    stopPlayback();
+    activeMidiUrl = null;
+    activePlaybackIsPreview = false;
+    previewRestoreState = null;
+}
+
+function revokeCompareResultUrls() {
+    Object.keys(compareResults).forEach(function (engine) {
+        revokeObjectUrl(compareResults[engine].url);
+    });
+}
+
+function resetCompareResults() {
+    restorePlaybackAfterPreview();
+    revokeCompareResultUrls();
     compareResults = {};
     compareCards.forEach(function (card) {
         var status = card.querySelector(".compare-status");
@@ -265,6 +302,11 @@ function hideCompareResults() {
 function showCompareResults() {
     compareResultsPanel.hidden = false;
     resetCompareResults();
+}
+
+function clearCompareResults() {
+    hideCompareResults();
+    setUploadStatus("Compare results cleared");
 }
 
 function updateCompareCard(engine, statusText, metaText) {
@@ -437,10 +479,10 @@ function updateMidiAnalysis(summary) {
 
 function resetCleanedMidi(message) {
     if (cleanedMidiUrl) {
-        URL.revokeObjectURL(cleanedMidiUrl);
+        revokeObjectUrl(cleanedMidiUrl);
     }
     if (cleanedPlaybackUrl && cleanedPlaybackUrl !== activeMidiUrl && cleanedPlaybackUrl.indexOf("blob:") === 0) {
-        URL.revokeObjectURL(cleanedPlaybackUrl);
+        revokeObjectUrl(cleanedPlaybackUrl);
         cleanedPlaybackUrl = null;
     }
     cleanedMidiUrl = null;
@@ -454,10 +496,10 @@ function resetCleanedMidi(message) {
 
 function resetPresetMidi(message) {
     if (presetMidiUrl) {
-        URL.revokeObjectURL(presetMidiUrl);
+        revokeObjectUrl(presetMidiUrl);
     }
     if (presetPlaybackUrl && presetPlaybackUrl !== activeMidiUrl && presetPlaybackUrl.indexOf("blob:") === 0) {
-        URL.revokeObjectURL(presetPlaybackUrl);
+        revokeObjectUrl(presetPlaybackUrl);
         presetPlaybackUrl = null;
     }
     presetMidiUrl = null;
@@ -473,7 +515,7 @@ function resetPresetMidi(message) {
 
 function resetSourceMidiDownload() {
     if (sourceMidiDownloadUrl) {
-        URL.revokeObjectURL(sourceMidiDownloadUrl);
+        revokeObjectUrl(sourceMidiDownloadUrl);
     }
     sourceMidiDownloadUrl = null;
     sourceMidiTitle = "";
@@ -1315,7 +1357,7 @@ function loadPresetMidi() {
     var fallbackPreset = arrangementPresets[arrangementPresetSelect.value] || arrangementPresets.piano;
     var presetLabel = presetCreatedLabel || fallbackPreset.label;
     if (presetPlaybackUrl && presetPlaybackUrl !== activeMidiUrl && presetPlaybackUrl.indexOf("blob:") === 0) {
-        URL.revokeObjectURL(presetPlaybackUrl);
+        revokeObjectUrl(presetPlaybackUrl);
     }
     presetPlaybackUrl = midiBytesToDataUrl(presetMidiBytes);
     activeSongTitle.textContent = (sourceMidiTitle || activeSongTitle.textContent || "Score") + " (Preset: " + presetLabel + ")";
@@ -1334,7 +1376,7 @@ function loadCleanedMidi() {
     if (!cleanedMidiBytes || !midiReady) return;
 
     if (cleanedPlaybackUrl && cleanedPlaybackUrl !== activeMidiUrl && cleanedPlaybackUrl.indexOf("blob:") === 0) {
-        URL.revokeObjectURL(cleanedPlaybackUrl);
+        revokeObjectUrl(cleanedPlaybackUrl);
     }
     cleanedPlaybackUrl = midiBytesToDataUrl(cleanedMidiBytes);
     activeSongTitle.textContent = (sourceMidiTitle || activeSongTitle.textContent || "Score") + " (Cleaned)";
@@ -1454,6 +1496,7 @@ function downloadNameFromSongName(songName) {
 function loadMidiFile(url, start, options) {
     options = options || {};
     activePlaybackIsPreview = false;
+    previewRestoreState = null;
     analyzeMidiUrl(url, options);
     loadMidiPlayback(url, start, options);
 }
@@ -1521,7 +1564,7 @@ function setPlaybackPrograms(programs) {
 function loadConvertedMidi(blob, downloadName, title, options) {
     options = options || {};
     if (convertedMidiUrl) {
-        URL.revokeObjectURL(convertedMidiUrl);
+        revokeObjectUrl(convertedMidiUrl);
     }
     convertedMidiUrl = URL.createObjectURL(blob);
     loadMidiFile(convertedMidiUrl, options.start !== false, {
@@ -1910,7 +1953,7 @@ midiFileInput.onchange = function () {
     }
 
     if (localMidiUrl) {
-        URL.revokeObjectURL(localMidiUrl);
+        revokeObjectUrl(localMidiUrl);
     }
     localMidiUrl = URL.createObjectURL(file);
     hideConversionResult();
@@ -2003,6 +2046,14 @@ compareCards.forEach(function (card) {
     previewButton.onclick = function () {
         var result = compareResults[engine];
         if (!result) return;
+        if (!activePlaybackIsPreview) {
+            previewRestoreState = {
+                url: activeMidiUrl,
+                title: activeSongTitle.textContent,
+                playbackProgram: activePlaybackProgram,
+                playbackPrograms: activePlaybackPrograms
+            };
+        }
         loadMidiPreview(result.url, true, { playbackProgram: arrangementPresets.piano.program });
         setUploadStatus("Previewing " + conversionEngines[engine].label + " result");
         activeSongTitle.textContent = result.title;
@@ -2015,6 +2066,22 @@ compareCards.forEach(function (card) {
         setUploadStatus("Loaded " + conversionEngines[engine].label + " result as source");
         activeSongTitle.textContent = result.title;
     };
+});
+
+if (clearCompareResultsButton) {
+    clearCompareResultsButton.onclick = clearCompareResults;
+}
+
+window.addEventListener("beforeunload", function () {
+    revokeObjectUrl(sourceAudioUrl);
+    revokeObjectUrl(convertedMidiUrl);
+    revokeObjectUrl(localMidiUrl);
+    revokeObjectUrl(cleanedMidiUrl);
+    revokeObjectUrl(cleanedPlaybackUrl);
+    revokeObjectUrl(presetMidiUrl);
+    revokeObjectUrl(presetPlaybackUrl);
+    revokeObjectUrl(sourceMidiDownloadUrl);
+    revokeCompareResultUrls();
 });
     
 var scene = new THREE.Scene();

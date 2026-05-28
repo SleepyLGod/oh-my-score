@@ -303,6 +303,15 @@ Engine selector status: V1 done. The async conversion API accepts `piano-onnx`
 or `basic-pitch`, and the frontend can run either single-engine conversion or a
 compare job that leaves the final choice to the user.
 
+Compare audition status: V1 done. Compare cards show neutral engine status,
+compact MIDI metrics, Preview/Load/Download actions, and keep the source audio
+preview available as the A/B reference.
+
+Compare lifecycle status: V1 done. Compare result URLs can be cleared without
+replacing the formally loaded Smart Score source, stale compare results are
+removed when the input or mode changes, and temporary browser object URLs are
+released during cleanup.
+
 Implementation scope:
 
 - Keep Piano ONNX as the default engine.

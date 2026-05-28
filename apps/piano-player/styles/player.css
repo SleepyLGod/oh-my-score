@@ -344,6 +344,12 @@ select {
 .compare-results[hidden] {
     display: none;
 }
+.compare-toolbar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+}
 .compare-card {
     display: grid;
     gap: 8px;
