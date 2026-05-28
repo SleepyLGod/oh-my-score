@@ -1,7 +1,11 @@
 <p align="center">
-  <img src="https://readme-typing-svg.herokuapp.com/?font=Roboto+Mono&size=25&width=240&color=46BEA3duration=1600&lines=🎵Oh-My-Score🎶" height="80"/>
-  </br>
-  <strong>✨ Convert piano audio to MIDI, then play it back in an interactive browser piano studio.</strong>
+  <img src="https://readme-typing-svg.herokuapp.com/?font=Roboto+Mono&size=25&width=300&color=46BEA3&duration=1600&lines=Oh-My-Score" height="80" alt="Oh-My-Score"/>
+  <br>
+  <strong>Audio-to-MIDI transcription, browser playback, and Smart Score tools in one local-first studio.</strong>
+</p>
+
+<p align="center">
+  English | <a href="./README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center">
@@ -18,32 +22,36 @@
 
 ## Overview
 
-OMG Score is a browser-based piano workflow:
+OMG Score turns piano recordings and MIDI files into a playable, inspectable
+browser workflow. It combines local audio-to-MIDI transcription, a 3D piano
+player, MIDI analysis, cleanup/export tools, and simple arrangement sketches.
 
-- Upload MP3/WAV piano audio and convert it to a standard MIDI file.
-- Play MIDI files in a 3D piano scene with animated keys.
-- Perform notes directly with mouse, touch, or keyboard input.
-- Download converted MIDI files from the browser after conversion.
-- Export simple General MIDI preset variants and preview bundled piano, strings,
-  bass, and soft synth soundfonts in the browser.
-- Run the full stack locally through Docker without installing Node, Java,
-  Maven, or FFmpeg on the host.
+The project is built for local-first experimentation: the full stack runs
+through Docker, while the static frontend can also be published as a GitHub
+Pages demo for MIDI playback and UI exploration.
 
-The static frontend can also be deployed to GitHub Pages. Static hosting supports
-MIDI playback and the 3D piano UI; audio-to-MIDI conversion still requires the
-backend API.
+## What You Can Do
 
-## Repository Layout
+- Convert MP3/WAV audio into standard MIDI files.
+- Choose Piano ONNX, Basic Pitch, or Compare mode for conversion.
+- Preview, load, and download generated MIDI results.
+- Inspect MIDI duration, tempo, tracks, channels, programs, notes, pitch range,
+  and rough polyphony.
+- Export source MIDI, conservatively cleaned MIDI, and General MIDI preset
+  variants.
+- Create lightweight Piano, Strings, Soft Synth, and Bass + Melody arrangement
+  sketches.
+- Play MIDI in a 3D piano studio with animated keys, timeline seek, loop, speed
+  control, mouse/touch input, and keyboard performance.
 
-```text
-apps/
-  piano-player/       Static 3D piano frontend
-  transcription-api/  Spring Boot audio-to-MIDI backend
-packages/
-  midi-player/        JavaScript MIDI parser/player package
-docs/
-  assets/             README and documentation images
-```
+## Why OMG Score
+
+- Local-first: audio conversion runs on your machine instead of a hosted service.
+- Docker-isolated: no host Node, Java, Maven, or FFmpeg install is required.
+- Transparent: converted MIDI stays downloadable and reusable in MuseScore, DAWs,
+  and other MIDI editors.
+- User-choice workflow: Compare mode is for listening and inspection; OMG Score
+  does not rank engines or select a result automatically.
 
 ## GitHub Pages Demo
 
@@ -52,11 +60,12 @@ https://sleepylgod.github.io/oh-my-score/
 ```
 
 The Pages workflow publishes [`apps/piano-player`](./apps/piano-player/).
+Static hosting supports MIDI playback and the 3D piano UI. Audio-to-MIDI
+conversion requires the local Docker backend.
 
 ## Isolated Local Run
 
-This is the preferred development path. Runtime caches, the ONNX model, and
-generated files stay under `.isolation/`.
+Runtime caches, the ONNX model, and generated files stay under `.isolation/`.
 
 ```bash
 mkdir -p .isolation/models
@@ -86,6 +95,37 @@ docker compose down
 If conversion fails with a missing model error, confirm that
 `.isolation/models/transcription.onnx` exists before starting Compose.
 
+## Current Status
+
+- Audio transcription: MP3/WAV upload, async jobs, Piano ONNX, Basic Pitch, and
+  Compare mode are implemented.
+- Browser playback: local MIDI open, 3D piano animation, timeline seek, loop,
+  speed control, and interactive performance input are implemented.
+- Smart Score tools: MIDI analysis, source export, conservative cleanup, preset
+  variants, and Bass + Melody sketches are implemented.
+- Development workflow: Docker isolation, frontend CI, backend CI, and GitHub
+  Pages deploy are configured.
+
+See [`docs/TODO.md`](./docs/TODO.md) for the detailed Smart Score roadmap and
+optional future backlog. See [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) for
+the local verification and pre-commit review checklist.
+
+## Repository Layout
+
+```text
+apps/
+  piano-player/       Static 3D piano frontend
+  transcription-api/  Spring Boot audio-to-MIDI backend
+  basic-pitch-service Docker-internal Basic Pitch sidecar
+packages/
+  midi-player/        JavaScript MIDI parser/player package
+docs/
+  assets/             README and documentation images
+experiments/
+  basic-pitch/        Docker-only Basic Pitch prototype
+  engine-eval/        Local engine comparison utility
+```
+
 ## API
 
 - `GET /transcription/health` returns backend health.
@@ -97,41 +137,8 @@ If conversion fails with a missing model error, confirm that
   `piano-onnx`.
 - `GET /transcription/jobs/{id}` returns queued, running, succeeded, or failed
   status for a conversion job.
-- `GET /transcription/jobs/{id}/midi` downloads the generated MIDI for a
-  job in the succeeded state.
-
-## Roadmap
-
-- [x] Convert MP3 files to standard MIDI files.
-- [x] Convert WAV files to standard MIDI files.
-- [x] Upload local audio files freely.
-- [x] Download converted MIDI files from the piano player.
-- [x] Open local MIDI files directly in the browser.
-- [x] Play standard MIDI files in the browser.
-- [x] Change playback tempo in the MIDI player.
-- [x] Control playback with play/pause, restart, stop, loop, and reset view.
-- [x] Animate piano keys during MIDI playback.
-- [x] Support interactive mouse, touch, and keyboard performance input.
-- [x] Show keyboard mapping with note labels for the selected octave.
-- [x] Show Smart Score MIDI analysis for loaded and converted MIDI.
-- [x] Export source and conservatively cleaned MIDI variants.
-- [x] Export and preview simple instrument preset MIDI variants.
-- [x] Export a Bass + Melody arrangement sketch from loaded MIDI.
-- [x] Add playback timeline and seek controls.
-- [x] Run frontend and backend CI on GitHub Actions.
-- [x] Add progress tracking for long-running conversion jobs.
-- [x] Profile conversion time and reuse the ONNX transcription session.
-- [x] Document alternative transcription engine research.
-- [x] Prototype Basic Pitch in a Docker-isolated research path.
-- [x] Support selectable Piano ONNX and Basic Pitch conversion engines.
-- [x] Compare Piano ONNX and Basic Pitch outputs for user audition.
-
-Compare mode is for listening and inspection; OMG Score does not rank engines
-or select a result automatically.
-
-See [`docs/TODO.md`](./docs/TODO.md) for the detailed Smart Score roadmap.
-See [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) for the local verification
-and pre-commit review checklist.
+- `GET /transcription/jobs/{id}/midi` downloads the generated MIDI for a job in
+  the succeeded state.
 
 ## Tech Stack
 
@@ -140,7 +147,7 @@ and pre-commit review checklist.
 - Spring Boot
 - Maven
 - FFmpeg
-- Piano transcription ONNX model
+- ONNX Runtime
 - Basic Pitch sidecar service
 
 ## Attribution
