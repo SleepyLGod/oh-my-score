@@ -17,12 +17,12 @@
 </p>
 
 <p align="center">
-  <img src="./docs/assets/demo.png" alt="OMG Score piano player demo">
+  <img src="./docs/assets/demo.png" alt="Oh-My-Score piano player demo">
 </p>
 
 ## Overview
 
-OMG Score turns piano recordings and MIDI files into a playable, inspectable
+Oh-My-Score turns piano recordings and MIDI files into a playable, inspectable
 browser workflow. It combines local audio-to-MIDI transcription, a 3D piano
 player, MIDI analysis, cleanup/export tools, and simple arrangement sketches.
 
@@ -44,13 +44,13 @@ Pages demo for MIDI playback and UI exploration.
 - Play MIDI in a 3D piano studio with animated keys, timeline seek, loop, speed
   control, mouse/touch input, and keyboard performance.
 
-## Why OMG Score
+## Why Oh-My-Score
 
 - Local-first: audio conversion runs on your machine instead of a hosted service.
 - Docker-isolated: no host Node, Java, Maven, or FFmpeg install is required.
 - Transparent: converted MIDI stays downloadable and reusable in MuseScore, DAWs,
   and other MIDI editors.
-- User-choice workflow: Compare mode is for listening and inspection; OMG Score
+- User-choice workflow: Compare mode is for listening and inspection; Oh-My-Score
   does not rank engines or select a result automatically.
 
 ## GitHub Pages Demo

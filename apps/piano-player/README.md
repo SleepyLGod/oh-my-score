@@ -1,6 +1,6 @@
 # Piano Player
 
-Static browser frontend for OMG Score. It plays MIDI files, renders an
+Static browser frontend for Oh-My-Score. It plays MIDI files, renders an
 interactive 3D piano, supports mouse/touch/keyboard performance input, and can
 call the transcription API to convert uploaded audio files into MIDI.
 

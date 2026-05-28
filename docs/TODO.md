@@ -1,6 +1,6 @@
-# OMG Score TODO: Smart Score Roadmap
+# Oh-My-Score TODO: Smart Score Roadmap
 
-This document tracks the next product direction for OMG Score: turning raw MIDI
+This document tracks the next product direction for Oh-My-Score: turning raw MIDI
 or transcribed piano audio into cleaner, more useful score material. The first
 phase should stay MIDI-first. Full arbitrary-song, multi-instrument audio
 transcription is research scope, not a short-term product promise.
@@ -9,7 +9,7 @@ transcription is research scope, not a short-term product promise.
 
 ### Product Goal
 
-Make OMG Score useful after the first MIDI is generated. The user should be able
+Make Oh-My-Score useful after the first MIDI is generated. The user should be able
 to inspect, clean, replay, and export a more usable version of the score without
 leaving the browser.
 
@@ -44,7 +44,7 @@ leaving the browser.
 
 ### Current Boundary
 
-OMG Score currently supports MP3/WAV piano audio to MIDI through the backend,
+Oh-My-Score currently supports MP3/WAV piano audio to MIDI through the backend,
 local MIDI loading in the frontend, and 3D piano playback in the browser. The
 MIDI parser already exposes useful musical events such as note events, tempo,
 channels, and program changes, but the product does not yet surface these as a
@@ -143,7 +143,7 @@ Implementation scope:
 Acceptance criteria:
 
 - The original MIDI remains downloadable and replayable.
-- The cleaned MIDI can be loaded back into OMG Score.
+- The cleaned MIDI can be loaded back into Oh-My-Score.
 - Cleanup does not remove normal short musical notes unless the user enables a
   stricter option.
 

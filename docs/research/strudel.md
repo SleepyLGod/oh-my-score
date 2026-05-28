@@ -2,7 +2,7 @@
 
 Checked on 2026-05-27.
 
-Strudel is interesting for OMG Score, but it belongs to a different product
+Strudel is interesting for Oh-My-Score, but it belongs to a different product
 lane than audio transcription. The official documentation describes Strudel as a
 web-based live coding environment that implements the Tidal Cycles algorithmic
 pattern language in JavaScript. Its MIDI documentation also describes Web MIDI
@@ -29,7 +29,7 @@ Non-fit for the current engine comparison:
 Do not add Strudel to the app yet. First finish automated ONNX vs Basic Pitch
 comparison. Then run a separate embedding feasibility spike:
 
-- Can a Strudel editor be embedded without turning OMG Score into a full live
+- Can a Strudel editor be embedded without turning Oh-My-Score into a full live
   coding IDE?
 - Can Strudel output be exported or captured as MIDI in a way that the existing
   Smart Score pipeline can open?

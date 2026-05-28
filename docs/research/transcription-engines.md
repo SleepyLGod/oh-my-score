@@ -2,7 +2,7 @@
 
 Checked on 2026-05-26.
 
-OMG Score currently uses the Java ONNX piano transcription path as its default
+Oh-My-Score currently uses the Java ONNX piano transcription path as its default
 backend engine. This research checkpoint records why a second, explicit engine
 path was worth prototyping and how future engines should be evaluated without
 silently replacing the default workflow.
@@ -53,7 +53,7 @@ official project documents Python 3.8-3.11 support. It accepts common audio
 formats including MP3, OGG, WAV, FLAC, and M4A, down-mixes to mono, resamples to
 22050 Hz, and can generate MIDI through both CLI and Python APIs.
 
-Fit for OMG Score:
+Fit for Oh-My-Score:
 
 - Input/output fit: strong. The CLI accepts an input audio path and writes MIDI,
   matching the existing job artifact model.
@@ -94,7 +94,7 @@ MT3 is a multi-task, multi-track transcription model based on T5X. It directly
 targets multi-instrument AMT and is therefore closer to the long-term "smart
 score" vision than simple General MIDI preset changes.
 
-Fit for OMG Score:
+Fit for Oh-My-Score:
 
 - Input/output fit: promising, because the goal is audio-to-notes for multiple
   instruments.
