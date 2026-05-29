@@ -41,6 +41,7 @@ Pages demo for MIDI playback and UI exploration.
   variants.
 - Create lightweight Piano, Strings, Soft Synth, and Bass + Melody arrangement
   sketches.
+- Generate fixed-length code-to-MIDI sketches from Strudel-style pattern code.
 - Play MIDI in a 3D piano studio with animated keys, timeline seek, loop, speed
   control, mouse/touch input, and keyboard performance.
 
@@ -86,6 +87,18 @@ The backend API listens on:
 http://localhost:8084
 ```
 
+The Strudel sketch service listens on:
+
+```text
+http://localhost:8091
+```
+
+Sketch mode executes user-supplied Strudel JavaScript inside the Docker
+sidecar, not in the main frontend bundle. The service accepts only configured
+frontend origins, rate-limits generation requests, syntax-checks patterns before
+export, and kills exports after 60 seconds. For shared deployments, add Docker
+CPU and memory limits before exposing the service beyond localhost.
+
 Stop the services:
 
 ```bash
@@ -103,6 +116,8 @@ If conversion fails with a missing model error, confirm that
   speed control, and interactive performance input are implemented.
 - Smart Score tools: MIDI analysis, source export, conservative cleanup, preset
   variants, and Bass + Melody sketches are implemented.
+- Sketch mode: fixed-length Strudel pattern export, MIDI preview, source load,
+  and download are implemented through a Docker-isolated sidecar.
 - Development workflow: Docker isolation, frontend CI, backend CI, and GitHub
   Pages deploy are configured.
 
@@ -117,6 +132,7 @@ apps/
   piano-player/       Static 3D piano frontend
   transcription-api/  Spring Boot audio-to-MIDI backend
   basic-pitch-service Docker-internal Basic Pitch sidecar
+  strudel-sketch-service Docker-isolated Strudel code-to-MIDI sidecar
 packages/
   midi-player/        JavaScript MIDI parser/player package
 docs/
@@ -149,6 +165,7 @@ experiments/
 - FFmpeg
 - ONNX Runtime
 - Basic Pitch sidecar service
+- Strudel sketch sidecar service
 
 ## Attribution
 

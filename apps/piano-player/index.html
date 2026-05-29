@@ -22,7 +22,7 @@
         <script src="./vendor/OrbitAndPanControls.js"></script>
         <script src="./vendor/ColladaLoader.js"></script>
 
-        <link rel="stylesheet" href="./styles/player.css">
+        <link rel="stylesheet" href="./styles/player.css?v=studio-tips">
     </head>
     <body>
         <div id="scene-vignette"></div>
@@ -35,14 +35,30 @@
                         <span class="brand-subtitle">Piano transcription and MIDI playback</span>
                     </span>
                 </div>
+                <nav class="mode-switch" aria-label="Workspace mode">
+                    <label>
+                        <input type="radio" name="workspace-mode" value="transcribe" checked>
+                        <span>Transcribe</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="workspace-mode" value="sketch">
+                        <span>Sketch</span>
+                    </label>
+                </nav>
                 <span id="midi-status" class="status-pill">
                     <span class="status-dot"></span>
                     <span id="midi-status-text">Loading soundfonts</span>
                 </span>
             </header>
 
-            <section id="upload-panel" class="panel">
-                <h2 class="panel-title">Audio to MIDI <span class="badge">MP3/WAV</span></h2>
+            <section id="upload-panel" class="panel source-panel">
+                <h2 class="panel-title">
+                    <span class="panel-title-stack">
+                        <span class="panel-kicker">Source & Jobs</span>
+                        <strong>Transcribe</strong>
+                    </span>
+                    <span class="badge">MP3/WAV/MIDI</span>
+                </h2>
                 <div class="field">
                     <span class="field-label">Source file</span>
                     <div class="file-row">
@@ -54,6 +70,10 @@
                 <div id="source-audio-preview" class="source-audio-preview" hidden>
                     <span class="field-label">Original audio</span>
                     <audio id="source-audio-player" controls preload="metadata"></audio>
+                </div>
+                <div class="field">
+                    <label class="field-label" for="song-select">Demo MIDI</label>
+                    <select id="song-select"></select>
                 </div>
                 <div class="field">
                     <span class="field-label">Transcription engine</span>
@@ -72,15 +92,15 @@
                         </label>
                     </div>
                 </div>
-                <button id="convert-button" class="primary-button" type="button" disabled>Convert to MIDI</button>
                 <div class="field">
-                    <span class="field-label">MIDI file</span>
+                    <span class="field-label">Local MIDI</span>
                     <div class="file-row">
                         <input id="midi-file" type="file" accept="audio/midi,audio/x-midi,.mid,.midi">
                         <label class="file-pick" for="midi-file">Open MIDI</label>
                         <span id="midi-file-name">No MIDI selected</span>
                     </div>
                 </div>
+                <button id="convert-button" class="primary-button" type="button" disabled>Convert to MIDI</button>
                 <div class="convert-status">
                     <span class="field-label">Status</span>
                     <span id="upload-status">Waiting</span>
@@ -129,40 +149,62 @@
                 </div>
             </section>
 
-            <aside id="settings-panel" class="panel">
-                <h2 class="panel-title">Performance</h2>
+            <section id="sketch-panel" class="panel" hidden>
+                <h2 class="panel-title">Code to MIDI <span class="badge">Sketch</span></h2>
                 <div class="field">
-                    <label class="field-label" for="song-select">Demo piece</label>
-                    <select id="song-select"></select>
+                    <label class="field-label" for="strudel-code">Pattern</label>
+                    <textarea id="strudel-code" spellcheck="false"></textarea>
                 </div>
-                <div class="field">
-                    <div class="inline-field">
-                        <label class="field-label" for="octave-slider">Octave</label>
-                        <span id="octave-value" class="value-readout">2</span>
+                <div class="sketch-controls">
+                    <div class="field">
+                        <label class="field-label" for="strudel-bars">Bars</label>
+                        <select id="strudel-bars">
+                            <option value="4">4</option>
+                            <option value="8" selected>8</option>
+                        </select>
                     </div>
-                    <input id="octave-slider" type="range" min="0" max="4" step="1" value="2">
+                    <div class="field">
+                        <label class="field-label" for="strudel-bpm">BPM</label>
+                        <input id="strudel-bpm" type="number" min="40" max="240" step="1" value="120">
+                    </div>
                 </div>
-                <div class="field">
-                    <div class="inline-field">
-                        <label class="field-label" for="note-color">Key light</label>
-                        <input id="note-color" type="color" value="#f0b35a">
+                <button id="generate-strudel-button" class="primary-button" type="button">Generate MIDI</button>
+                <div class="convert-status">
+                    <span class="field-label">Status</span>
+                    <span id="strudel-status">Ready to sketch</span>
+                </div>
+                <div id="strudel-result" class="sketch-result" hidden>
+                    <div>
+                        <span class="field-label">Generated MIDI</span>
+                        <strong id="strudel-result-title">Strudel sketch</strong>
+                    </div>
+                    <span id="strudel-metrics" class="compare-metrics">Waiting for MIDI metrics</span>
+                    <div class="sketch-actions">
+                        <button id="preview-strudel-button" class="secondary-button" type="button">Preview</button>
+                        <button id="load-strudel-button" class="secondary-button" type="button">Load as Source</button>
+                        <a id="download-strudel-link" class="secondary-button" href="#" download>Download</a>
                     </div>
                 </div>
-                <details class="keyboard-map">
-                    <summary>
-                        <span class="field-label">Keyboard map</span>
-                        <span class="value-readout">Octave <span id="keyboard-octave-value">2</span></span>
-                    </summary>
-                    <div class="key-grid">
-                        <div id="lower-key-row" class="key-row" aria-label="Lower keyboard row"></div>
-                        <div id="middle-key-row" class="key-row" aria-label="Middle keyboard row"></div>
-                        <div id="upper-key-row" class="key-row" aria-label="Upper keyboard row"></div>
-                    </div>
-                </details>
+            </section>
+
+            <aside id="settings-panel" class="panel inspector-panel">
+                <h2 class="panel-title">
+                    <span class="panel-title-stack">
+                        <span class="panel-kicker">Score Inspector</span>
+                        <strong>Smart Score</strong>
+                    </span>
+                    <span class="badge">MIDI</span>
+                </h2>
                 <details id="smart-score-panel" class="smart-score" open>
-                    <summary>
-                        <span class="field-label">Smart Score</span>
-                        <span class="value-readout">MIDI Analysis</span>
+                    <summary class="disclosure-summary">
+                        <span class="disclosure-copy">
+                            <span class="disclosure-title">MIDI Analysis</span>
+                            <span class="disclosure-subtitle">Score details</span>
+                        </span>
+                        <span class="disclosure-trailing">
+                            <span id="analysis-disclosure-status" class="summary-chip">Empty</span>
+                            <span class="disclosure-chevron" aria-hidden="true"></span>
+                        </span>
                     </summary>
                     <p id="analysis-status">Load a MIDI file to inspect score details.</p>
                     <div class="analysis-grid" aria-label="MIDI analysis summary">
@@ -215,6 +257,48 @@
                     </div>
                     <p id="preset-status">Presets write General MIDI programs and use bundled browser soundfonts.</p>
                 </details>
+                <details class="performance-dock">
+                    <summary class="disclosure-summary">
+                        <span class="disclosure-copy">
+                            <span class="disclosure-title">Keyboard & Stage</span>
+                            <span class="disclosure-subtitle">Performance controls</span>
+                        </span>
+                        <span class="disclosure-trailing">
+                            <span class="summary-chip">Controls</span>
+                            <span class="disclosure-chevron" aria-hidden="true"></span>
+                        </span>
+                    </summary>
+                    <div class="field">
+                        <div class="inline-field">
+                            <label class="field-label" for="octave-slider">Octave</label>
+                            <span id="octave-value" class="value-readout">2</span>
+                        </div>
+                        <input id="octave-slider" type="range" min="0" max="4" step="1" value="2">
+                    </div>
+                    <div class="field">
+                        <div class="inline-field">
+                            <label class="field-label" for="note-color">Key light</label>
+                            <input id="note-color" type="color" value="#f0b35a">
+                        </div>
+                    </div>
+                    <details class="keyboard-map">
+                        <summary class="disclosure-summary">
+                            <span class="disclosure-copy">
+                                <span class="disclosure-title">Keyboard map</span>
+                                <span class="disclosure-subtitle">Computer keys</span>
+                            </span>
+                            <span class="disclosure-trailing">
+                                <span class="summary-chip">Octave <span id="keyboard-octave-value">2</span></span>
+                                <span class="disclosure-chevron" aria-hidden="true"></span>
+                            </span>
+                        </summary>
+                        <div class="key-grid">
+                            <div id="lower-key-row" class="key-row" aria-label="Lower keyboard row"></div>
+                            <div id="middle-key-row" class="key-row" aria-label="Middle keyboard row"></div>
+                            <div id="upper-key-row" class="key-row" aria-label="Upper keyboard row"></div>
+                        </div>
+                    </details>
+                </details>
             </aside>
 
             <footer id="transport-bar">
@@ -243,6 +327,19 @@
                     <input id="speed-slider" type="range" min="0.5" max="2" step="0.1" value="1">
                 </div>
             </footer>
+            <div class="stage-tips">
+                <button id="stage-tips-button" class="stage-tips-button" type="button" aria-label="Show stage controls" aria-controls="stage-tips-popover" aria-expanded="false">?</button>
+                <div id="stage-tips-popover" class="stage-tips-popover" hidden>
+                    <strong>Stage controls</strong>
+                    <ul>
+                        <li><span>Left drag</span><span>Orbit camera</span></li>
+                        <li><span>Right drag</span><span>Pan camera</span></li>
+                        <li><span>Wheel / trackpad</span><span>Zoom</span></li>
+                        <li><span>Click or tap keys</span><span>Play notes</span></li>
+                        <li><span>Keyboard keys</span><span>Perform notes</span></li>
+                    </ul>
+                </div>
+            </div>
             <div id="copyright">Copyright © Von Lu</div>
         </div>
         <script src="./scripts/player.js" type="text/javascript"></script>

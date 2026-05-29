@@ -36,6 +36,21 @@ services:
       timeout: 5s
       retries: 12
 
+  strudel-sketch-service:
+    build:
+      context: .
+      dockerfile: apps/strudel-sketch-service/Dockerfile
+    environment:
+      STRUDEL_FRONTEND_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+    ports:
+      - "8091:8091"
+    working_dir: /workspace/experiment
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8091/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   frontend:
     build:
       context: .
@@ -44,6 +59,8 @@ services:
       - "8080:80"
     depends_on:
       backend:
+        condition: service_healthy
+      strudel-sketch-service:
         condition: service_healthy
 
   basic-pitch:

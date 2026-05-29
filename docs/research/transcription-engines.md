@@ -112,8 +112,8 @@ Risks:
 
 - The runtime stack is much larger than the current Java backend and Basic Pitch
   prototype path.
-- Multi-instrument output would require new UI language and validation so OMG
-  Score does not overpromise arbitrary-song sheet music.
+- Multi-instrument output would require new UI language and validation so
+  Oh-My-Score does not overpromise arbitrary-song sheet music.
 - Quality evaluation is harder because the expected output is no longer just a
   single piano-like MIDI track.
 

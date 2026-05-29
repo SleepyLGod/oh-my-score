@@ -312,6 +312,11 @@ replacing the formally loaded Smart Score source, stale compare results are
 removed when the input or mode changes, and temporary browser object URLs are
 released during cleanup.
 
+Studio polish status: V1 done. The app keeps the same Transcribe and Sketch
+workflows, but the interface is organized around clearer studio regions: Source
+& Jobs, Stage, Score Inspector, and shared transport. Strudel service cleanup
+remains a reliability task, not a new product capability.
+
 Implementation scope:
 
 - Keep Piano ONNX as the default engine.
@@ -339,8 +344,8 @@ this backlog instead of being treated as the next required step:
    velocity range if users need more control over exported MIDI.
 3. Add a configurable Bass + Melody split point if arrangement sketches become
    a frequent workflow.
-4. Productize Strudel sketches only if code-to-MIDI becomes a real workflow;
-   note that the isolated spike has already proved that fixed Strudel patterns
-   can export readable MIDI.
+4. Strudel Sketch Mode V1 is implemented as a separate `Sketch` workspace with
+   fixed-length MIDI generation, preview, load-as-source, and download. Future
+   Strudel work should focus on editor ergonomics, not transcription claims.
 5. Keep MT3-style multi-instrument transcription as future research until there
    is a reproducible Docker prototype and a clear UI contract.

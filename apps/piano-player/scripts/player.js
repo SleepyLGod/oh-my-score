@@ -2,8 +2,10 @@
 MIDI.loader = new widgets.Loader({ message: "Loading: Soundfonts...", background: "rgba(16,18,21,0.88)" });
 var localTranscriptionApiUrl = "http://localhost:8084/transcription/audioToMidiWithFile";
 var localTranscriptionJobsApiUrl = "http://localhost:8084/transcription/jobs";
+var localStrudelSketchApiUrl = "http://localhost:8091/generate";
 var transcriptionApiUrl = window.OMG_TRANSCRIPTION_API_URL || defaultTranscriptionApiUrl();
 var transcriptionJobsApiUrl = window.OMG_TRANSCRIPTION_JOBS_API_URL || defaultTranscriptionJobsApiUrl();
+var strudelSketchApiUrl = window.OMG_STRUDEL_SKETCH_API_URL || defaultStrudelSketchApiUrl();
 var activeMidiUrl = null;
 var convertedMidiUrl = null;
 var localMidiUrl = null;
@@ -11,9 +13,13 @@ var cleanedMidiUrl = null;
 var cleanedPlaybackUrl = null;
 var presetMidiUrl = null;
 var presetPlaybackUrl = null;
+var strudelMidiUrl = null;
 var activeMidiBytes = null;
 var cleanedMidiBytes = null;
 var presetMidiBytes = null;
+var strudelMidiBlob = null;
+var strudelDownloadName = "";
+var strudelPlaybackTitle = "";
 var sourceMidiDownloadUrl = null;
 var sourceMidiTitle = "";
 var sourceAudioUrl = null;
@@ -21,6 +27,9 @@ var presetCreatedLabel = "";
 var midiReady = false;
 var loopEnabled = false;
 var loopRestartQueued = false;
+var uploadPanel = document.getElementById("upload-panel");
+var settingsPanel = document.getElementById("settings-panel");
+var workspaceModeInputs = Array.prototype.slice.call(document.querySelectorAll('input[name="workspace-mode"]'));
 var uploadFileInput = document.getElementById("audio-file");
 var midiFileInput = document.getElementById("midi-file");
 var convertButton = document.getElementById("convert-button");
@@ -36,6 +45,18 @@ var conversionModeInputs = Array.prototype.slice.call(document.querySelectorAll(
 var compareResultsPanel = document.getElementById("compare-results");
 var clearCompareResultsButton = document.getElementById("clear-compare-results-button");
 var compareCards = Array.prototype.slice.call(document.querySelectorAll(".compare-card"));
+var sketchPanel = document.getElementById("sketch-panel");
+var strudelCodeInput = document.getElementById("strudel-code");
+var strudelBarsSelect = document.getElementById("strudel-bars");
+var strudelBpmInput = document.getElementById("strudel-bpm");
+var generateStrudelButton = document.getElementById("generate-strudel-button");
+var strudelStatus = document.getElementById("strudel-status");
+var strudelResult = document.getElementById("strudel-result");
+var strudelResultTitle = document.getElementById("strudel-result-title");
+var strudelMetrics = document.getElementById("strudel-metrics");
+var previewStrudelButton = document.getElementById("preview-strudel-button");
+var loadStrudelButton = document.getElementById("load-strudel-button");
+var downloadStrudelLink = document.getElementById("download-strudel-link");
 var midiFileName = document.getElementById("midi-file-name");
 var midiStatus = document.getElementById("midi-status");
 var midiStatusText = document.getElementById("midi-status-text");
@@ -55,9 +76,12 @@ var resetViewButton = document.getElementById("reset-view-button");
 var timelineSlider = document.getElementById("timeline-slider");
 var currentTimeReadout = document.getElementById("current-time");
 var durationTimeReadout = document.getElementById("duration-time");
+var stageTipsButton = document.getElementById("stage-tips-button");
+var stageTipsPopover = document.getElementById("stage-tips-popover");
 var lowerKeyRow = document.getElementById("lower-key-row");
 var middleKeyRow = document.getElementById("middle-key-row");
 var upperKeyRow = document.getElementById("upper-key-row");
+var analysisDisclosureStatus = document.getElementById("analysis-disclosure-status");
 var analysisStatus = document.getElementById("analysis-status");
 var analysisDuration = document.getElementById("analysis-duration");
 var analysisTempo = document.getElementById("analysis-tempo");
@@ -92,6 +116,20 @@ var playbackClockStartMs = 0;
 var playbackClockBaseSeconds = 0;
 var conversionPollDelayMs = 1200;
 var maxConversionPollAttempts = 500;
+var defaultStrudelPatternSource = `import { note } from "@strudel/core/controls.mjs";
+import { seq, stack } from "@strudel/core/pattern.mjs";
+
+export const metadata = {
+  name: "strudel-sketch",
+  title: "Strudel Sketch"
+};
+
+const melody = note(seq("C4", "D4", "E4", "G4", "A4", "G4", "E4", "D4"));
+const bass = note(seq("C2", "G1", "A1", "F1")).slow(2);
+
+export const pattern = stack(bass, melody);
+export default pattern;
+`;
 var noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 var conversionEngines = {
     "piano-onnx": { label: "Piano ONNX", description: "Piano-focused baseline" },
@@ -181,6 +219,14 @@ function defaultTranscriptionJobsApiUrl() {
     return "";
 }
 
+function defaultStrudelSketchApiUrl() {
+    var host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "") {
+        return localStrudelSketchApiUrl;
+    }
+    return "";
+}
+
 function setUploadStatus(message) {
     uploadStatus.textContent = message;
 }
@@ -238,15 +284,8 @@ function setSourceAudioPreview(file) {
     sourceAudioPreview.hidden = false;
 }
 
-function compareResultUsesActivePreview() {
-    if (!activePlaybackIsPreview || !activeMidiUrl) return false;
-    return Object.keys(compareResults).some(function (engine) {
-        return compareResults[engine].url === activeMidiUrl;
-    });
-}
-
 function restorePlaybackAfterPreview() {
-    if (!compareResultUsesActivePreview()) return;
+    if (!activePlaybackIsPreview) return;
     if (previewRestoreState && previewRestoreState.url) {
         var restoreState = previewRestoreState;
         previewRestoreState = null;
@@ -262,6 +301,17 @@ function restorePlaybackAfterPreview() {
     activeMidiUrl = null;
     activePlaybackIsPreview = false;
     previewRestoreState = null;
+}
+
+function setWorkspaceMode(mode) {
+    var isSketchMode = mode === "sketch";
+    if (!isSketchMode) {
+        restorePlaybackAfterPreview();
+    }
+    uploadPanel.hidden = isSketchMode;
+    settingsPanel.hidden = isSketchMode;
+    sketchPanel.hidden = !isSketchMode;
+    document.body.classList.toggle("sketch-mode", isSketchMode);
 }
 
 function revokeCompareResultUrls() {
@@ -368,6 +418,123 @@ function showCompareResult(engine, job, blob, songName) {
     downloadLink.download = downloadName;
 }
 
+function setStrudelStatus(message) {
+    strudelStatus.textContent = message;
+}
+
+function resetStrudelResult(message) {
+    if (activePlaybackIsPreview && activeMidiUrl === strudelMidiUrl) {
+        restorePlaybackAfterPreview();
+    }
+    revokeObjectUrl(strudelMidiUrl);
+    strudelMidiUrl = null;
+    strudelMidiBlob = null;
+    strudelDownloadName = "";
+    strudelPlaybackTitle = "";
+    strudelResult.hidden = true;
+    strudelMetrics.textContent = "Waiting for MIDI metrics";
+    downloadStrudelLink.removeAttribute("href");
+    downloadStrudelLink.removeAttribute("download");
+    if (message) {
+        setStrudelStatus(message);
+    }
+}
+
+function bytesFromBase64(text) {
+    var binary = atob(text);
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+}
+
+function strudelJsonError(response, payload) {
+    var message = payload && payload.error ? payload.error : response.statusText;
+    throw new Error("HTTP " + response.status + ": " + (message || "Strudel sketch request failed."));
+}
+
+function fetchStrudelSketch(payload) {
+    if (!strudelSketchApiUrl) {
+        return Promise.reject(new Error("Strudel sketch needs local Docker service."));
+    }
+    return fetch(strudelSketchApiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    }).then(function (response) {
+        return response.json().catch(function () {
+            return {};
+        }).then(function (payload) {
+            if (!response.ok) {
+                strudelJsonError(response, payload);
+            }
+            return payload;
+        });
+    });
+}
+
+function showStrudelResult(payload) {
+    var bytes = bytesFromBase64(payload.midiBase64 || "");
+    strudelMidiBlob = new Blob([bytes], { type: "audio/midi" });
+    strudelMidiUrl = URL.createObjectURL(strudelMidiBlob);
+    strudelDownloadName = safeMidiDownloadName(payload.fileName || "strudel-sketch.mid");
+    strudelPlaybackTitle = "Strudel Sketch";
+
+    strudelResult.hidden = false;
+    strudelResultTitle.textContent = strudelDownloadName + " (" + formatBytes(strudelMidiBlob.size) + ")";
+    downloadStrudelLink.href = strudelMidiUrl;
+    downloadStrudelLink.download = strudelDownloadName;
+
+    try {
+        strudelMetrics.textContent = compareMetricsText(strudelMidiBlob, parseMidiAnalysis(bytes));
+    } catch (error) {
+        console.warn(error);
+        strudelMetrics.textContent = "Analysis unavailable · " + formatBytes(strudelMidiBlob.size);
+    }
+}
+
+function generateStrudelSketch() {
+    resetStrudelResult();
+    setStrudelStatus("Generating MIDI sketch...");
+    generateStrudelButton.disabled = true;
+    fetchStrudelSketch({
+        source: strudelCodeInput.value,
+        bars: strudelBarsSelect.value,
+        bpm: strudelBpmInput.value
+    }).then(function (payload) {
+        showStrudelResult(payload);
+        setStrudelStatus("Sketch generated. Preview or load as source.");
+    }).catch(function (error) {
+        console.error(error);
+        setStrudelStatus(strudelErrorMessage(error));
+    }).finally(function () {
+        generateStrudelButton.disabled = false;
+    });
+}
+
+function previewStrudelSketch() {
+    if (!strudelMidiUrl) return;
+    if (!activePlaybackIsPreview) {
+        previewRestoreState = {
+            url: activeMidiUrl,
+            title: activeSongTitle.textContent,
+            playbackProgram: activePlaybackProgram,
+            playbackPrograms: activePlaybackPrograms
+        };
+    }
+    loadMidiPreview(strudelMidiUrl, true, { playbackProgram: arrangementPresets.piano.program });
+    activeSongTitle.textContent = strudelPlaybackTitle + " Preview";
+    setStrudelStatus("Previewing sketch MIDI");
+}
+
+function loadStrudelSketchAsSource() {
+    if (!strudelMidiBlob) return;
+    loadConvertedMidi(strudelMidiBlob, strudelDownloadName, strudelPlaybackTitle, { start: false });
+    activeSongTitle.textContent = strudelPlaybackTitle;
+    setStrudelStatus("Loaded sketch as source");
+}
+
 function setMidiStatus(message, statusClass) {
     midiStatus.className = "status-pill" + (statusClass ? " " + statusClass : "");
     midiStatusText.textContent = message;
@@ -447,8 +614,9 @@ function midiNoteName(noteNumber) {
     return noteNames[noteNumber % 12] + (Math.floor(noteNumber / 12) - 1);
 }
 
-function resetMidiAnalysis(message) {
+function resetMidiAnalysis(message, statusLabel) {
     analysisStatus.textContent = message || "Load a MIDI file to inspect score details.";
+    analysisDisclosureStatus.textContent = statusLabel || "Empty";
     analysisDuration.textContent = "--";
     analysisTempo.textContent = "--";
     analysisTracks.textContent = "--";
@@ -464,6 +632,7 @@ function resetMidiAnalysis(message) {
 
 function updateMidiAnalysis(summary) {
     analysisStatus.textContent = "Analysis ready";
+    analysisDisclosureStatus.textContent = summary.noteCount ? "Ready" : "Empty";
     analysisDuration.textContent = formatDuration(summary.durationSeconds);
     analysisTempo.textContent = summary.tempoLabel;
     analysisTracks.textContent = formatCount(summary.trackCount, "track", "tracks");
@@ -587,6 +756,15 @@ function updatePresetFields() {
     melodySoundField.hidden = !preset.split;
 }
 
+function setStageTipsOpen(isOpen) {
+    stageTipsPopover.hidden = !isOpen;
+    stageTipsButton.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
+
+function toggleStageTips() {
+    setStageTipsOpen(stageTipsPopover.hidden);
+}
+
 function analyzeMidiUrl(url, options) {
     options = options || {};
     var requestId = ++analysisRequestId;
@@ -621,7 +799,7 @@ function analyzeMidiUrl(url, options) {
             resetSourceMidiDownload();
         }
         console.warn(error);
-        resetMidiAnalysis("MIDI analysis unavailable. Playback may still work.");
+        resetMidiAnalysis("MIDI analysis unavailable. Playback may still work.", "Unavailable");
     });
 }
 
@@ -2030,12 +2208,32 @@ function conversionErrorMessage(error) {
     return message || "Conversion failed.";
 }
 
+function strudelErrorMessage(error) {
+    var message = error && error.message ? error.message : "";
+    if (message.indexOf("Failed to fetch") >= 0 || message.indexOf("NetworkError") >= 0) {
+        return "Strudel service unavailable. Start Docker and retry.";
+    }
+    if (message.indexOf("No MIDI note events") >= 0) {
+        return "No MIDI notes found in this sketch.";
+    }
+    if (message.indexOf("timed out") >= 0) {
+        return "Sketch generation timed out.";
+    }
+    return message || "Sketch generation failed.";
+}
+
 conversionModeInputs.forEach(function (input) {
     input.onchange = function () {
         hideConversionResult();
         hideCompareResults();
         updateUploadButton();
         setUploadStatus(uploadFileInput.files.length ? "Ready to convert" : "Waiting");
+    };
+});
+
+workspaceModeInputs.forEach(function (input) {
+    input.onchange = function () {
+        setWorkspaceMode(input.value);
     };
 });
 
@@ -2080,6 +2278,7 @@ window.addEventListener("beforeunload", function () {
     revokeObjectUrl(cleanedPlaybackUrl);
     revokeObjectUrl(presetMidiUrl);
     revokeObjectUrl(presetPlaybackUrl);
+    revokeObjectUrl(strudelMidiUrl);
     revokeObjectUrl(sourceMidiDownloadUrl);
     revokeCompareResultUrls();
 });
@@ -2472,6 +2671,10 @@ function isKeyboardInputTarget(target) {
 }
     
 window.onkeydown = function (ev) {
+    if (ev.key === "Escape" && stageTipsPopover && !stageTipsPopover.hidden) {
+        setStageTipsOpen(false);
+        return;
+    }
     if (isKeyboardInputTarget(ev.target)) return;
     if (typeof keys_down[ev.keyCode] !== "number") {
         var keyIndex = keyCode_to_keyIndex(ev.keyCode);
@@ -2499,6 +2702,8 @@ renderer.domElement.addEventListener("touchend", onPianoTouchEnd, true);
 renderer.domElement.addEventListener("touchcancel", onPianoTouchEnd, true);
     
 window.onload = function () {
+    strudelCodeInput.value = defaultStrudelPatternSource;
+    setWorkspaceMode("transcribe");
     populateSongSelect();
     renderKeyboardMap();
     updatePresetFields();
@@ -2520,6 +2725,9 @@ window.onload = function () {
     loadCleanedMidiButton.onclick = loadCleanedMidi;
     createPresetMidiButton.onclick = createPresetMidi;
     loadPresetMidiButton.onclick = loadPresetMidi;
+    generateStrudelButton.onclick = generateStrudelSketch;
+    previewStrudelButton.onclick = previewStrudelSketch;
+    loadStrudelButton.onclick = loadStrudelSketchAsSource;
     arrangementPresetSelect.onchange = function () {
         updatePresetFields();
         resetPresetMidi();
@@ -2535,6 +2743,7 @@ window.onload = function () {
         setLoopEnabled(!loopEnabled);
     };
     resetViewButton.onclick = resetCameraView;
+    stageTipsButton.onclick = toggleStageTips;
     speedSlider.oninput = function () {
         controls.playbackSpeed = parseFloat(speedSlider.value);
         speedValue.textContent = controls.playbackSpeed.toFixed(1) + "x";

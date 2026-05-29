@@ -25,7 +25,8 @@ Non-fit for the current engine comparison:
 
 ## Feasibility Spike
 
-Status: V1 done under `experiments/strudel-sketch/`.
+Status: V1 done under `experiments/strudel-sketch/`, then productized as a
+Docker-isolated `strudel-sketch-service` and a separate frontend `Sketch` mode.
 
 The first spike keeps Strudel outside the main app and tests the smallest useful
 path:
@@ -52,20 +53,31 @@ Smoke result: the default pattern exported a 2-track Standard MIDI file with
 is readable by the experiment inspector and can be opened through Oh-My-Score's
 existing `Open MIDI` path.
 
+Product V1 keeps the scope intentionally narrow: users can generate fixed 4/8
+bar MIDI sketches, preview the result, load it as the current Smart Score source,
+or download it. It is not a full Strudel live coding IDE, Web MIDI device output
+surface, or audio transcription engine.
+
+Runtime boundary: Sketch mode executes user-supplied Strudel JavaScript in the
+Docker sidecar. The service restricts CORS to configured frontend origins,
+rate-limits generation requests, rejects oversized pattern source, runs a syntax
+check before export, and kills exports after 60 seconds. If the service is ever
+exposed beyond localhost, the Compose deployment should also set explicit CPU
+and memory limits.
+
 The top-level `@strudel/core` and `@strudel/tonal` imports are not used in the
 Node exporter because they currently pull in browser REPL code that fails in the
 isolated Node runtime. That is useful evidence for productization: direct app
 integration should be treated as a separate UI/license decision, not as a
 backend-style engine dependency.
 
-Current V1 questions:
+Future questions:
 
-- Can a Strudel editor be embedded without turning Oh-My-Score into a full live
-  coding IDE?
-- Can Strudel output be exported or captured as MIDI in a way that the existing
-  Smart Score pipeline can open?
-- Does this improve the product for score creation, or is linking to the
-  official Strudel REPL enough for V1?
+- Should the editor add examples, linting, or syntax highlighting without
+  becoming a full live coding IDE?
+- Should Sketch mode support drum/percussion mappings or stay pitch-only?
+- Should advanced users be linked to the official Strudel REPL for live coding
+  workflows instead of expanding Oh-My-Score into a full REPL?
 
 License note: Strudel packages are AGPL-3.0-or-later. Direct app integration
 needs a separate license decision before productization. A research container or
