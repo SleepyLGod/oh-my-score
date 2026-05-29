@@ -112,12 +112,14 @@ If conversion fails with a missing model error, confirm that
 
 - Audio transcription: MP3/WAV upload, async jobs, Piano ONNX, Basic Pitch, and
   Compare mode are implemented.
-- Browser playback: local MIDI open, 3D piano animation, timeline seek, loop,
-  speed control, and interactive performance input are implemented.
+- Browser playback: local MIDI open, 3D piano animation, timeline seek,
+  bar/beat review, loop ranges, speed control, and interactive performance
+  input are implemented.
 - Smart Score tools: MIDI analysis, source export, conservative cleanup, preset
   variants, and Bass + Melody sketches are implemented.
-- Sketch mode: fixed-length Strudel pattern export, MIDI preview, source load,
-  and download are implemented through a Docker-isolated sidecar.
+- Sketch mode: fixed-length Strudel pattern export, example patterns,
+  lightweight editor actions, MIDI preview, source load, and download are
+  implemented through a Docker-isolated sidecar.
 - Development workflow: Docker isolation, frontend CI, backend CI, and GitHub
   Pages deploy are configured.
 

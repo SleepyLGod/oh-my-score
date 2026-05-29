@@ -46,9 +46,13 @@ var compareResultsPanel = document.getElementById("compare-results");
 var clearCompareResultsButton = document.getElementById("clear-compare-results-button");
 var compareCards = Array.prototype.slice.call(document.querySelectorAll(".compare-card"));
 var sketchPanel = document.getElementById("sketch-panel");
+var strudelExampleSelect = document.getElementById("strudel-example");
 var strudelCodeInput = document.getElementById("strudel-code");
 var strudelBarsSelect = document.getElementById("strudel-bars");
 var strudelBpmInput = document.getElementById("strudel-bpm");
+var resetStrudelExampleButton = document.getElementById("reset-strudel-example-button");
+var tidyStrudelButton = document.getElementById("tidy-strudel-button");
+var clearStrudelButton = document.getElementById("clear-strudel-button");
 var generateStrudelButton = document.getElementById("generate-strudel-button");
 var strudelStatus = document.getElementById("strudel-status");
 var strudelResult = document.getElementById("strudel-result");
@@ -74,8 +78,15 @@ var restartButton = document.getElementById("restart-button");
 var loopButton = document.getElementById("loop-button");
 var resetViewButton = document.getElementById("reset-view-button");
 var timelineSlider = document.getElementById("timeline-slider");
+var timelineGrid = document.getElementById("timeline-grid");
 var currentTimeReadout = document.getElementById("current-time");
 var durationTimeReadout = document.getElementById("duration-time");
+var barBeatReadout = document.getElementById("bar-beat-readout");
+var totalBarsReadout = document.getElementById("total-bars-readout");
+var loopStartButton = document.getElementById("loop-start-button");
+var loopEndButton = document.getElementById("loop-end-button");
+var loopClearButton = document.getElementById("loop-clear-button");
+var loopRangeStatus = document.getElementById("loop-range-status");
 var stageTipsButton = document.getElementById("stage-tips-button");
 var stageTipsPopover = document.getElementById("stage-tips-popover");
 var lowerKeyRow = document.getElementById("lower-key-row");
@@ -105,6 +116,10 @@ var loadPresetMidiButton = document.getElementById("load-preset-midi-button");
 var presetStatus = document.getElementById("preset-status");
 var analysisRequestId = 0;
 var timelineDurationSeconds = 0;
+var timelineBpm = 120;
+var timelineBeatsPerBar = 4;
+var loopRangeStartSeconds = null;
+var loopRangeEndSeconds = null;
 var activePlaybackProgram = 0;
 var activePlaybackPrograms = null;
 var activePlaybackIsPreview = false;
@@ -116,12 +131,13 @@ var playbackClockStartMs = 0;
 var playbackClockBaseSeconds = 0;
 var conversionPollDelayMs = 1200;
 var maxConversionPollAttempts = 500;
-var defaultStrudelPatternSource = `import { note } from "@strudel/core/controls.mjs";
+var strudelExamples = {
+    arpeggio: `import { note } from "@strudel/core/controls.mjs";
 import { seq, stack } from "@strudel/core/pattern.mjs";
 
 export const metadata = {
   name: "strudel-sketch",
-  title: "Strudel Sketch"
+  title: "Arpeggio Sketch"
 };
 
 const melody = note(seq("C4", "D4", "E4", "G4", "A4", "G4", "E4", "D4"));
@@ -129,7 +145,53 @@ const bass = note(seq("C2", "G1", "A1", "F1")).slow(2);
 
 export const pattern = stack(bass, melody);
 export default pattern;
-`;
+`,
+    bassline: `import { note } from "@strudel/core/controls.mjs";
+import { seq, stack } from "@strudel/core/pattern.mjs";
+
+export const metadata = {
+  name: "bassline-sketch",
+  title: "Bassline Sketch"
+};
+
+const bass = note(seq("C2", "C2", "G1", "A1", "F1", "F1", "G1", "G1"));
+const pulse = note(seq("C3", "G2")).slow(4);
+
+export const pattern = stack(bass, pulse);
+export default pattern;
+`,
+    chords: `import { note } from "@strudel/core/controls.mjs";
+import { seq, stack } from "@strudel/core/pattern.mjs";
+
+export const metadata = {
+  name: "chord-sketch",
+  title: "Chord Sketch"
+};
+
+const root = note(seq("C3", "F3", "A2", "G2")).slow(2);
+const third = note(seq("E3", "A3", "C3", "B2")).slow(2);
+const fifth = note(seq("G3", "C4", "E3", "D3")).slow(2);
+const top = note(seq("C4", "A3", "E4", "D4"));
+
+export const pattern = stack(root, third, fifth, top);
+export default pattern;
+`,
+    minimal: `import { note } from "@strudel/core/controls.mjs";
+import { seq, stack } from "@strudel/core/pattern.mjs";
+
+export const metadata = {
+  name: "minimal-melody",
+  title: "Minimal Melody"
+};
+
+const melody = note(seq("D4", "F4", "A4", "G4", "F4", "D4")).slow(2);
+const drone = note(seq("D2")).slow(8);
+
+export const pattern = stack(drone, melody);
+export default pattern;
+`
+};
+var defaultStrudelExample = "arpeggio";
 var noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 var conversionEngines = {
     "piano-onnx": { label: "Piano ONNX", description: "Piano-focused baseline" },
@@ -440,6 +502,33 @@ function resetStrudelResult(message) {
     }
 }
 
+function selectedStrudelExample() {
+    return strudelExamples[strudelExampleSelect.value] ? strudelExampleSelect.value : defaultStrudelExample;
+}
+
+function loadStrudelExample(key, message) {
+    var exampleKey = strudelExamples[key] ? key : defaultStrudelExample;
+    strudelExampleSelect.value = exampleKey;
+    strudelCodeInput.value = strudelExamples[exampleKey];
+    resetStrudelResult(message || "Example loaded. Generate MIDI when ready.");
+}
+
+function tidyStrudelSource() {
+    strudelCodeInput.value = strudelCodeInput.value
+        .split("\n")
+        .map(function (line) {
+            return line.replace(/\s+$/g, "");
+        })
+        .join("\n")
+        .trim() + "\n";
+    resetStrudelResult("Sketch tidied. Generate MIDI when ready.");
+}
+
+function clearStrudelSource() {
+    strudelCodeInput.value = "";
+    resetStrudelResult("Sketch cleared");
+}
+
 function bytesFromBase64(text) {
     var binary = atob(text);
     var bytes = new Uint8Array(binary.length);
@@ -565,23 +654,96 @@ function formatDuration(seconds) {
     return minutes + ":" + String(remainingSeconds).padStart(2, "0");
 }
 
+function beatDurationSeconds() {
+    return timelineBpm > 0 ? 60 / timelineBpm : 0.5;
+}
+
+function barBeatFromSeconds(seconds) {
+    var beatSeconds = beatDurationSeconds();
+    var totalBeats = Math.max(0, Math.floor((seconds || 0) / beatSeconds));
+    return {
+        bar: Math.floor(totalBeats / timelineBeatsPerBar) + 1,
+        beat: totalBeats % timelineBeatsPerBar + 1
+    };
+}
+
+function totalTimelineBars() {
+    var beatSeconds = beatDurationSeconds();
+    if (!timelineDurationSeconds || !beatSeconds) return 0;
+    return Math.max(1, Math.ceil(timelineDurationSeconds / beatSeconds / timelineBeatsPerBar));
+}
+
+function formatBarBeat(seconds) {
+    if (!timelineDurationSeconds) return "Bar -- Beat --";
+    var position = barBeatFromSeconds(seconds);
+    return "Bar " + position.bar + " Beat " + position.beat;
+}
+
+function setLoopRangeButtonsEnabled(enabled) {
+    loopStartButton.disabled = !enabled;
+    loopEndButton.disabled = !enabled;
+    loopClearButton.disabled = !enabled || !hasLoopRange();
+}
+
+function renderTimelineGrid() {
+    timelineGrid.innerHTML = "";
+    var bars = totalTimelineBars();
+    if (!bars) return;
+
+    var interval = Math.max(1, Math.ceil(bars / 8));
+    for (var bar = 1; bar <= bars; bar += interval) {
+        var marker = document.createElement("span");
+        marker.textContent = String(bar);
+        marker.style.left = bars > 1 ? ((bar - 1) / (bars - 1) * 100).toFixed(2) + "%" : "0";
+        timelineGrid.appendChild(marker);
+    }
+    if (bars > 1 && (bars - 1) % interval !== 0) {
+        var endMarker = document.createElement("span");
+        endMarker.textContent = String(bars);
+        endMarker.style.left = "100%";
+        timelineGrid.appendChild(endMarker);
+    }
+}
+
+function updateBarBeatReadouts(seconds) {
+    var bars = totalTimelineBars();
+    barBeatReadout.textContent = formatBarBeat(seconds || 0);
+    totalBarsReadout.textContent = bars ? bars + " bars" : "-- bars";
+}
+
 function resetTimeline() {
     timelineDurationSeconds = 0;
+    timelineBpm = 120;
+    timelineBeatsPerBar = 4;
+    loopRangeStartSeconds = null;
+    loopRangeEndSeconds = null;
     timelineSlider.value = "0";
     timelineSlider.disabled = true;
     currentTimeReadout.textContent = "0:00";
     durationTimeReadout.textContent = "--";
+    timelineGrid.innerHTML = "";
+    updateBarBeatReadouts(0);
+    updateLoopRangeStatus();
+    setLoopRangeButtonsEnabled(false);
 }
 
-function setTimelineDuration(seconds) {
+function setTimelineDuration(seconds, options) {
+    options = options || {};
     timelineDurationSeconds = isFinite(seconds) && seconds > 0 ? seconds : 0;
+    timelineBpm = options.bpm || timelineBpm || 120;
+    timelineBeatsPerBar = options.beatsPerBar || 4;
     timelineSlider.disabled = timelineDurationSeconds <= 0;
     durationTimeReadout.textContent = formatDuration(timelineDurationSeconds);
+    renderTimelineGrid();
+    updateBarBeatReadouts(0);
+    updateLoopRangeStatus();
+    setLoopRangeButtonsEnabled(timelineDurationSeconds > 0);
 }
 
 function updateTimelinePosition(seconds) {
     var boundedSeconds = Math.max(0, Math.min(seconds || 0, timelineDurationSeconds || seconds || 0));
     currentTimeReadout.textContent = formatDuration(boundedSeconds);
+    updateBarBeatReadouts(boundedSeconds);
     if (!isSeekingTimeline && timelineDurationSeconds > 0) {
         timelineSlider.value = String(Math.round(boundedSeconds / timelineDurationSeconds * 1000));
     }
@@ -603,6 +765,64 @@ function syncPlayerSeekTime(seconds) {
     var milliseconds = Math.max(0, seconds) * 1000;
     MIDI.Player.currentTime = milliseconds;
     MIDI.Player.restart = milliseconds;
+}
+
+function hasLoopRange() {
+    return loopRangeStartSeconds !== null
+        && loopRangeEndSeconds !== null
+        && loopRangeEndSeconds > loopRangeStartSeconds + 0.05;
+}
+
+function activeLoopStartSeconds() {
+    return hasLoopRange() ? loopRangeStartSeconds : 0;
+}
+
+function activeLoopEndSeconds(fallbackEndSeconds) {
+    return hasLoopRange() ? loopRangeEndSeconds : fallbackEndSeconds;
+}
+
+function updateLoopRangeStatus(message) {
+    if (message) {
+        loopRangeStatus.textContent = message;
+    } else if (hasLoopRange()) {
+        loopRangeStatus.textContent = "Loop range: "
+            + formatDuration(loopRangeStartSeconds) + " - " + formatDuration(loopRangeEndSeconds)
+            + " · " + formatBarBeat(loopRangeStartSeconds);
+    } else {
+        loopRangeStatus.textContent = "Loop range: full track";
+    }
+    if (loopClearButton) {
+        loopClearButton.disabled = !timelineDurationSeconds || !hasLoopRange();
+    }
+}
+
+function setLoopRangeStart() {
+    if (!timelineDurationSeconds) return;
+    loopRangeStartSeconds = currentTimelineSeekSeconds();
+    if (loopRangeEndSeconds !== null && loopRangeEndSeconds <= loopRangeStartSeconds + 0.05) {
+        loopRangeEndSeconds = null;
+    }
+    updateLoopRangeStatus();
+}
+
+function setLoopRangeEnd() {
+    if (!timelineDurationSeconds) return;
+    var endSeconds = currentTimelineSeekSeconds();
+    if (loopRangeStartSeconds === null) {
+        loopRangeStartSeconds = 0;
+    }
+    if (endSeconds <= loopRangeStartSeconds + 0.05) {
+        updateLoopRangeStatus("Loop range needs an end after the start");
+        return;
+    }
+    loopRangeEndSeconds = endSeconds;
+    updateLoopRangeStatus();
+}
+
+function clearLoopRange() {
+    loopRangeStartSeconds = null;
+    loopRangeEndSeconds = null;
+    updateLoopRangeStatus();
 }
 
 function formatCount(count, singular, plural) {
@@ -643,7 +863,10 @@ function updateMidiAnalysis(summary) {
     analysisPolyphony.textContent = summary.maxPolyphony + " max";
     cleanMidiButton.disabled = !activeMidiBytes || !summary.noteCount;
     createPresetMidiButton.disabled = !activeMidiBytes || !summary.noteCount;
-    setTimelineDuration(summary.durationSeconds);
+    setTimelineDuration(summary.durationSeconds, {
+        bpm: summary.primaryBpm,
+        beatsPerBar: summary.beatsPerBar
+    });
 }
 
 function resetCleanedMidi(message) {
@@ -927,6 +1150,11 @@ function parseMidiTrack(bytes, start, end, summary) {
                     bpm: Math.round(60000000 / microsecondsPerQuarter),
                     microsecondsPerQuarter: microsecondsPerQuarter
                 });
+            } else if (metaType === 0x58 && metaLength >= 2 && !summary.timeSignature) {
+                summary.timeSignature = {
+                    numerator: bytes[state.offset],
+                    denominator: Math.pow(2, bytes[state.offset + 1])
+                };
             }
             state.offset += metaLength;
             continue;
@@ -1598,6 +1826,7 @@ function parseMidiAnalysis(bytes) {
         programs: {},
         channelPrograms: {},
         tempoEvents: [],
+        timeSignature: null,
         polyphonyEvents: [],
         noteCount: 0,
         minPitch: 128,
@@ -1630,6 +1859,8 @@ function parseMidiAnalysis(bytes) {
     return {
         durationSeconds: durationSecondsFromTempoEvents(summary.maxTick, division, summary.tempoEvents),
         tempoLabel: formatTempoLabel(summary.tempoEvents),
+        primaryBpm: summary.tempoEvents.length ? summary.tempoEvents[0].bpm : 120,
+        beatsPerBar: summary.timeSignature && summary.timeSignature.numerator ? summary.timeSignature.numerator : 4,
         trackCount: summary.trackCount || declaredTrackCount,
         channelCount: channelCount,
         programLabel: programCount
@@ -1766,6 +1997,11 @@ function setPlaybackState(isPlaying) {
 function startPlayback() {
     if (!activeMidiUrl || !midiReady) return;
     playbackClockBaseSeconds = currentTimelineSeekSeconds();
+    if (loopEnabled && hasLoopRange()
+            && (playbackClockBaseSeconds < loopRangeStartSeconds || playbackClockBaseSeconds >= loopRangeEndSeconds)) {
+        playbackClockBaseSeconds = loopRangeStartSeconds;
+        updateTimelinePosition(playbackClockBaseSeconds);
+    }
     playbackClockStartMs = Date.now();
     syncPlayerSeekTime(playbackClockBaseSeconds);
     MIDI.Player.resume();
@@ -1802,7 +2038,9 @@ function stopPlayback() {
 function restartPlayback() {
     if (!activeMidiUrl || !midiReady) return;
     loopRestartQueued = false;
-    updateTimelinePosition(0);
+    var restartSeconds = loopEnabled && hasLoopRange() ? loopRangeStartSeconds : 0;
+    updateTimelinePosition(restartSeconds);
+    syncPlayerSeekTime(restartSeconds);
     if (activePlaybackIsPreview) {
         loadMidiPreview(activeMidiUrl, true, currentVariantPreserveOptions());
     } else {
@@ -1814,6 +2052,7 @@ function setLoopEnabled(enabled) {
     loopEnabled = enabled;
     loopButton.classList.toggle("is-active", loopEnabled);
     loopButton.setAttribute("aria-pressed", loopEnabled ? "true" : "false");
+    updateLoopRangeStatus();
 }
 
 function beginTimelineSeek() {
@@ -1873,7 +2112,9 @@ function setupPlaybackAnimation() {
 
             if (!MIDI.Player.playing) return;
 
-            var reachedEnd = currentPlaybackSeconds() >= data.end;
+            var currentSeconds = currentPlaybackSeconds();
+            var loopEndSeconds = activeLoopEndSeconds(data.end);
+            var reachedEnd = currentSeconds >= loopEndSeconds;
             if (!reachedEnd) {
                 loopRestartQueued = false;
                 return;
@@ -1881,7 +2122,15 @@ function setupPlaybackAnimation() {
 
             if (loopEnabled && !loopRestartQueued) {
                 loopRestartQueued = true;
-                window.setTimeout(restartPlayback, 0);
+                window.setTimeout(function () {
+                    loopRestartQueued = false;
+                    playbackClockBaseSeconds = activeLoopStartSeconds();
+                    playbackClockStartMs = Date.now();
+                    syncPlayerSeekTime(playbackClockBaseSeconds);
+                    updateTimelinePosition(playbackClockBaseSeconds);
+                    MIDI.Player.resume();
+                    setPlaybackState(true);
+                }, 0);
             } else if (!loopEnabled) {
                 stopPlayback();
             }
@@ -2702,7 +2951,7 @@ renderer.domElement.addEventListener("touchend", onPianoTouchEnd, true);
 renderer.domElement.addEventListener("touchcancel", onPianoTouchEnd, true);
     
 window.onload = function () {
-    strudelCodeInput.value = defaultStrudelPatternSource;
+    loadStrudelExample(defaultStrudelExample, "Ready to sketch");
     setWorkspaceMode("transcribe");
     populateSongSelect();
     renderKeyboardMap();
@@ -2728,6 +2977,14 @@ window.onload = function () {
     generateStrudelButton.onclick = generateStrudelSketch;
     previewStrudelButton.onclick = previewStrudelSketch;
     loadStrudelButton.onclick = loadStrudelSketchAsSource;
+    strudelExampleSelect.onchange = function () {
+        loadStrudelExample(selectedStrudelExample());
+    };
+    resetStrudelExampleButton.onclick = function () {
+        loadStrudelExample(selectedStrudelExample());
+    };
+    tidyStrudelButton.onclick = tidyStrudelSource;
+    clearStrudelButton.onclick = clearStrudelSource;
     arrangementPresetSelect.onchange = function () {
         updatePresetFields();
         resetPresetMidi();
@@ -2742,6 +2999,9 @@ window.onload = function () {
     loopButton.onclick = function () {
         setLoopEnabled(!loopEnabled);
     };
+    loopStartButton.onclick = setLoopRangeStart;
+    loopEndButton.onclick = setLoopRangeEnd;
+    loopClearButton.onclick = clearLoopRange;
     resetViewButton.onclick = resetCameraView;
     stageTipsButton.onclick = toggleStageTips;
     speedSlider.oninput = function () {

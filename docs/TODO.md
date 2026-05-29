@@ -181,20 +181,22 @@ Acceptance criteria:
 
 Goal: make score review efficient.
 
-Status: V1 done for current time, duration, progress display, and basic seek.
-Future polish can add loop ranges or bar/beat grid after the player state is
-more structured.
+Status: V1 done for current time, duration, progress display, basic seek,
+bar/beat display, timeline bar markers, and loop ranges.
 
 Implementation scope:
 
-- Add timeline progress, current time, duration, and seek.
+- Add timeline progress, current time, duration, seek, bar/beat display, and
+  simple timeline markers.
+- Add loop start, loop end, and loop range clearing while preserving full-track
+  loop behavior when no range is set.
 - Preserve existing play/pause, restart, stop, loop, and reset view controls.
 - Keep keyboard and mouse performance input independent from playback controls.
 
 Acceptance criteria:
 
 - Seeking during playback resumes from the selected position.
-- Loop behavior remains predictable after seeking.
+- Loop behavior remains predictable after seeking and when a loop range is set.
 - Timeline updates do not cause layout shifts.
 
 ### P2: Async Conversion Jobs
@@ -317,6 +319,14 @@ workflows, but the interface is organized around clearer studio regions: Source
 & Jobs, Stage, Score Inspector, and shared transport. Strudel service cleanup
 remains a reliability task, not a new product capability.
 
+Review tools status: V1 done. The shared transport now shows bar/beat context,
+estimated total bars, timeline markers, and loop range controls.
+
+Strudel ergonomics status: V1 done. Sketch mode includes Arpeggio, Bassline,
+Chord sketch, and Minimal melody examples plus reset, tidy, and clear editor
+actions. Examples replace the editor content only; MIDI generation remains an
+explicit user action.
+
 Implementation scope:
 
 - Keep Piano ONNX as the default engine.
@@ -338,14 +348,11 @@ Acceptance criteria:
 The main V1 workflow is complete. Future work should be picked deliberately from
 this backlog instead of being treated as the next required step:
 
-1. Add loop ranges or a bar/beat grid if timeline review becomes the main pain
-   point.
-2. Add cleanup controls for short-note threshold, duplicate strictness, and
+1. Add cleanup controls for short-note threshold, duplicate strictness, and
    velocity range if users need more control over exported MIDI.
-3. Add a configurable Bass + Melody split point if arrangement sketches become
+2. Add a configurable Bass + Melody split point if arrangement sketches become
    a frequent workflow.
-4. Strudel Sketch Mode V1 is implemented as a separate `Sketch` workspace with
-   fixed-length MIDI generation, preview, load-as-source, and download. Future
-   Strudel work should focus on editor ergonomics, not transcription claims.
-5. Keep MT3-style multi-instrument transcription as future research until there
+3. Continue deeper Strudel editor polish only if code-to-MIDI sketching becomes
+   a frequent workflow; keep it separate from transcription claims.
+4. Keep MT3-style multi-instrument transcription as future research until there
    is a reproducible Docker prototype and a clear UI contract.

@@ -471,6 +471,12 @@ select {
     grid-template-columns: 1fr 1fr;
     gap: 12px;
 }
+.sketch-editor-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0 0 12px;
+}
 .sketch-result {
     display: grid;
     gap: 10px;
@@ -758,7 +764,8 @@ kbd small {
     grid-template-columns: minmax(270px, auto) minmax(0, 1fr) minmax(180px, 260px);
     grid-template-areas:
         "buttons track speed"
-        "timeline timeline timeline";
+        "timeline timeline timeline"
+        "review review review";
     align-items: center;
     gap: 16px;
     padding: 14px;
@@ -910,6 +917,31 @@ kbd small {
     align-items: center;
     gap: 10px;
 }
+.timeline-track {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+.timeline-grid {
+    position: relative;
+    height: 14px;
+    color: var(--muted);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+.timeline-grid span {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+}
+.timeline-grid span::before {
+    content: "";
+    display: block;
+    width: 1px;
+    height: 5px;
+    margin: 0 auto 2px;
+    background: rgba(245, 239, 228, 0.28);
+}
 .time-readout {
     min-width: 38px;
     color: var(--muted);
@@ -920,6 +952,43 @@ kbd small {
 #timeline-slider:disabled {
     cursor: default;
     opacity: 0.45;
+}
+.review-control {
+    grid-area: review;
+    display: grid;
+    grid-template-columns: minmax(160px, auto) minmax(0, 1fr) minmax(140px, auto);
+    align-items: center;
+    gap: 10px;
+    padding-top: 2px;
+    border-top: 1px solid rgba(245, 239, 228, 0.08);
+}
+.review-readouts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+#bar-beat-readout {
+    color: var(--text);
+    font-weight: 760;
+}
+.loop-range-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.loop-range-actions .secondary-button {
+    min-height: 30px;
+    padding: 0 9px;
+    font-size: 11px;
+}
+#loop-range-status {
+    color: var(--muted);
+    font-size: 11px;
+    text-align: right;
+    overflow-wrap: anywhere;
 }
 .speed-label {
     display: flex;
@@ -977,6 +1046,7 @@ a {
         grid-template-areas:
             "buttons track"
             "timeline timeline"
+            "review review"
             "speed speed";
     }
     #copyright {
@@ -1036,6 +1106,7 @@ a {
             "buttons"
             "track"
             "timeline"
+            "review"
             "speed";
     }
     #copyright {
@@ -1062,8 +1133,15 @@ a {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .sketch-controls,
-    .sketch-actions {
+    .sketch-actions,
+    .sketch-editor-actions {
         grid-template-columns: 1fr;
+    }
+    .review-control {
+        grid-template-columns: 1fr;
+    }
+    #loop-range-status {
+        text-align: left;
     }
     textarea {
         min-height: 220px;

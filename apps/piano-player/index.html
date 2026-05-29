@@ -152,6 +152,20 @@
             <section id="sketch-panel" class="panel" hidden>
                 <h2 class="panel-title">Code to MIDI <span class="badge">Sketch</span></h2>
                 <div class="field">
+                    <label class="field-label" for="strudel-example">Example</label>
+                    <select id="strudel-example">
+                        <option value="arpeggio" selected>Arpeggio</option>
+                        <option value="bassline">Bassline</option>
+                        <option value="chords">Chord sketch</option>
+                        <option value="minimal">Minimal melody</option>
+                    </select>
+                </div>
+                <div class="sketch-editor-actions">
+                    <button id="reset-strudel-example-button" class="secondary-button" type="button">Reset example</button>
+                    <button id="tidy-strudel-button" class="secondary-button" type="button">Tidy</button>
+                    <button id="clear-strudel-button" class="secondary-button" type="button">Clear</button>
+                </div>
+                <div class="field">
                     <label class="field-label" for="strudel-code">Pattern</label>
                     <textarea id="strudel-code" spellcheck="false"></textarea>
                 </div>
@@ -316,8 +330,23 @@
                 </div>
                 <div class="timeline-control" aria-label="Playback timeline">
                     <span id="current-time" class="time-readout">0:00</span>
-                    <input id="timeline-slider" type="range" min="0" max="1000" step="1" value="0" disabled>
+                    <div class="timeline-track">
+                        <input id="timeline-slider" type="range" min="0" max="1000" step="1" value="0" disabled>
+                        <div id="timeline-grid" class="timeline-grid" aria-hidden="true"></div>
+                    </div>
                     <span id="duration-time" class="time-readout">--</span>
+                </div>
+                <div class="review-control" aria-label="Bar beat and loop range controls">
+                    <div class="review-readouts">
+                        <span id="bar-beat-readout">Bar -- Beat --</span>
+                        <span id="total-bars-readout">-- bars</span>
+                    </div>
+                    <div class="loop-range-actions">
+                        <button id="loop-start-button" class="secondary-button" type="button" disabled>Set loop start</button>
+                        <button id="loop-end-button" class="secondary-button" type="button" disabled>Set loop end</button>
+                        <button id="loop-clear-button" class="secondary-button" type="button" disabled>Clear loop range</button>
+                    </div>
+                    <span id="loop-range-status">Loop range: full track</span>
                 </div>
                 <div class="speed-control">
                     <div class="speed-label">
