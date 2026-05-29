@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare OMG Score transcription engines with isolated local artifacts."""
+"""Compare Oh-My-Score transcription engines with isolated local artifacts."""
 
 from __future__ import annotations
 
@@ -544,7 +544,7 @@ def write_report(results: list[SampleResult], report_path: Path, generated_synth
 
     report_path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        "# OMG Score Engine Comparison",
+        "# Oh-My-Score Engine Comparison",
         "",
         f"Generated at: {time.strftime('%Y-%m-%d %H:%M:%S %Z')}",
         "",
@@ -569,7 +569,7 @@ def write_report(results: list[SampleResult], report_path: Path, generated_synth
     lines.extend(
         [
             "Automatic metrics are useful for spotting obvious output differences, but they do not measure accuracy without a ground-truth MIDI.",
-            "Use the manual rating columns after opening the generated MIDI files in OMG Score or an external editor.",
+            "Use the manual rating columns after opening the generated MIDI files in Oh-My-Score or an external editor.",
             "",
             "## Summary Table",
             "",

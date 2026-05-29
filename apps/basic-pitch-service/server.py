@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small HTTP wrapper around Basic Pitch for OMG Score Docker Compose."""
+"""Small HTTP wrapper around Basic Pitch for Oh-My-Score Docker Compose."""
 
 from __future__ import annotations
 
