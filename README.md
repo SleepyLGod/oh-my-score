@@ -41,7 +41,8 @@ Pages demo for MIDI playback and UI exploration.
   variants.
 - Create lightweight Piano, Strings, Soft Synth, and Bass + Melody arrangement
   sketches.
-- Generate fixed-length code-to-MIDI sketches from Strudel-style pattern code.
+- Generate fixed-length code-to-MIDI sketches from Strudel-style pattern code,
+  or optionally ask a configured AI model for an editable pattern draft.
 - Play MIDI in a 3D piano studio with animated keys, timeline seek, loop, speed
   control, mouse/touch input, and keyboard performance.
 
@@ -93,6 +94,24 @@ The Strudel sketch service listens on:
 http://localhost:8091
 ```
 
+The optional AI sketch service listens on:
+
+```text
+http://localhost:8092
+```
+
+To enable AI-generated Strudel drafts, copy [`.env.example`](./.env.example) to
+`.env` and set at least one model key. Use `DEEPSEEK_API_KEY` for
+`deepseek-v4-pro`; use `XIAOMI_API_KEY` for `mimo-v2.5-pro`
+(`MIMO_API_KEY` is also accepted as a compatibility alias). The frontend never
+receives these keys; the Docker sidecar routes the selected model through
+OpenAI-compatible Chat Completions locally.
+
+MiMo Token Plan keys start with `tp-` and should use
+`MIMO_BASE_URL=https://token-plan-cn.xiaomimimo.com/v1`. Pay-as-you-go keys
+start with `sk-` and should use the pay-as-you-go base URL from the Xiaomi
+console.
+
 Sketch mode executes user-supplied Strudel JavaScript inside the Docker
 sidecar, not in the main frontend bundle. The service accepts only configured
 frontend origins, rate-limits generation requests, syntax-checks patterns before
@@ -120,6 +139,9 @@ If conversion fails with a missing model error, confirm that
 - Sketch mode: fixed-length Strudel pattern export, example patterns,
   lightweight editor actions, MIDI preview, source load, and download are
   implemented through a Docker-isolated sidecar.
+- Optional AI Sketch: `deepseek-v4-pro` and `mimo-v2.5-pro` can generate
+  editable Strudel pattern drafts when the matching local API key is configured.
+  MiMo uses a compact sketch-spec builder internally for reliability.
 - Development workflow: Docker isolation, frontend CI, backend CI, and GitHub
   Pages deploy are configured.
 
@@ -135,6 +157,7 @@ apps/
   transcription-api/  Spring Boot audio-to-MIDI backend
   basic-pitch-service Docker-internal Basic Pitch sidecar
   strudel-sketch-service Docker-isolated Strudel code-to-MIDI sidecar
+  ai-sketch-service   Optional AI prompt-to-Strudel sidecar
 packages/
   midi-player/        JavaScript MIDI parser/player package
 docs/
@@ -168,6 +191,7 @@ experiments/
 - ONNX Runtime
 - Basic Pitch sidecar service
 - Strudel sketch sidecar service
+- OpenAI-compatible AI sketch sidecar
 
 ## Attribution
 

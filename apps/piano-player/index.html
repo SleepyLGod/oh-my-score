@@ -151,6 +151,45 @@
 
             <section id="sketch-panel" class="panel" hidden>
                 <h2 class="panel-title">Code to MIDI <span class="badge">Sketch</span></h2>
+                <div class="ai-sketch-card">
+                    <div class="ai-sketch-header">
+                        <div>
+                            <span class="field-label">AI Sketch</span>
+                            <strong>Prompt to pattern</strong>
+                        </div>
+                        <span class="badge">Optional</span>
+                    </div>
+                    <div class="ai-sketch-grid">
+                        <div class="field">
+                            <label class="field-label" for="ai-model">Model</label>
+                            <select id="ai-model">
+                                <option value="deepseek-v4-pro" selected>deepseek-v4-pro</option>
+                                <option value="mimo-v2.5-pro">mimo-v2.5-pro</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label class="field-label" for="ai-style">Style</label>
+                            <select id="ai-style">
+                                <option value="ambient" selected>Ambient</option>
+                                <option value="classical">Classical</option>
+                                <option value="jazz">Jazz</option>
+                                <option value="chiptune">Chiptune</option>
+                                <option value="minimal">Minimal</option>
+                                <option value="cinematic">Cinematic</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="ai-prompt">Prompt</label>
+                        <textarea id="ai-prompt" class="compact-textarea" spellcheck="true" placeholder="Gentle arpeggio in D minor with a warm bass movement"></textarea>
+                    </div>
+                    <button id="generate-ai-sketch-button" class="secondary-button" type="button">Generate Pattern</button>
+                    <div class="convert-status ai-sketch-status">
+                        <span class="field-label">AI</span>
+                        <span id="ai-sketch-status">Optional local AI service</span>
+                    </div>
+                    <p id="ai-sketch-meta" class="muted-note" hidden></p>
+                </div>
                 <div class="field">
                     <label class="field-label" for="strudel-example">Example</label>
                     <select id="strudel-example">

@@ -3,9 +3,11 @@ MIDI.loader = new widgets.Loader({ message: "Loading: Soundfonts...", background
 var localTranscriptionApiUrl = "http://localhost:8084/transcription/audioToMidiWithFile";
 var localTranscriptionJobsApiUrl = "http://localhost:8084/transcription/jobs";
 var localStrudelSketchApiUrl = "http://localhost:8091/generate";
+var localAiSketchApiUrl = "http://localhost:8092/suggest";
 var transcriptionApiUrl = window.OMG_TRANSCRIPTION_API_URL || defaultTranscriptionApiUrl();
 var transcriptionJobsApiUrl = window.OMG_TRANSCRIPTION_JOBS_API_URL || defaultTranscriptionJobsApiUrl();
 var strudelSketchApiUrl = window.OMG_STRUDEL_SKETCH_API_URL || defaultStrudelSketchApiUrl();
+var aiSketchApiUrl = window.OMG_AI_SKETCH_API_URL || defaultAiSketchApiUrl();
 var activeMidiUrl = null;
 var convertedMidiUrl = null;
 var localMidiUrl = null;
@@ -50,6 +52,12 @@ var strudelExampleSelect = document.getElementById("strudel-example");
 var strudelCodeInput = document.getElementById("strudel-code");
 var strudelBarsSelect = document.getElementById("strudel-bars");
 var strudelBpmInput = document.getElementById("strudel-bpm");
+var aiModelSelect = document.getElementById("ai-model");
+var aiStyleSelect = document.getElementById("ai-style");
+var aiPromptInput = document.getElementById("ai-prompt");
+var generateAiSketchButton = document.getElementById("generate-ai-sketch-button");
+var aiSketchStatus = document.getElementById("ai-sketch-status");
+var aiSketchMeta = document.getElementById("ai-sketch-meta");
 var resetStrudelExampleButton = document.getElementById("reset-strudel-example-button");
 var tidyStrudelButton = document.getElementById("tidy-strudel-button");
 var clearStrudelButton = document.getElementById("clear-strudel-button");
@@ -285,6 +293,14 @@ function defaultStrudelSketchApiUrl() {
     var host = window.location.hostname;
     if (host === "localhost" || host === "127.0.0.1" || host === "") {
         return localStrudelSketchApiUrl;
+    }
+    return "";
+}
+
+function defaultAiSketchApiUrl() {
+    var host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "") {
+        return localAiSketchApiUrl;
     }
     return "";
 }
@@ -527,6 +543,76 @@ function tidyStrudelSource() {
 function clearStrudelSource() {
     strudelCodeInput.value = "";
     resetStrudelResult("Sketch cleared");
+}
+
+function setAiSketchStatus(message) {
+    aiSketchStatus.textContent = message;
+}
+
+function setAiSketchMeta(message) {
+    aiSketchMeta.textContent = message || "";
+    aiSketchMeta.hidden = !message;
+}
+
+function aiSketchJsonError(response, payload) {
+    var message = payload && payload.error ? payload.error : response.statusText;
+    throw new Error("HTTP " + response.status + ": " + (message || "AI sketch request failed."));
+}
+
+function fetchAiSketchSuggestion(payload) {
+    if (!aiSketchApiUrl) {
+        return Promise.reject(new Error("AI sketch needs local Docker service."));
+    }
+    return fetch(aiSketchApiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    }).then(function (response) {
+        return response.json().catch(function () {
+            return {};
+        }).then(function (payload) {
+            if (!response.ok) {
+                aiSketchJsonError(response, payload);
+            }
+            return payload;
+        });
+    });
+}
+
+function applyAiSketchSuggestion(payload) {
+    strudelCodeInput.value = payload.source || "";
+    resetStrudelResult("AI pattern ready. Review code, then Generate MIDI.");
+    var warningText = Array.isArray(payload.warnings) && payload.warnings.length
+        ? " Warnings: " + payload.warnings.join(" ")
+        : "";
+    setAiSketchMeta((payload.explanation || "Pattern generated.") + warningText);
+    setAiSketchStatus("Generated with " + (payload.model || "model"));
+}
+
+function generateAiStrudelPattern() {
+    var prompt = aiPromptInput.value.trim();
+    if (!prompt) {
+        setAiSketchStatus("Describe the sketch first.");
+        aiPromptInput.focus();
+        return;
+    }
+    setAiSketchStatus(aiModelSelect.value === "mimo-v2.5-pro"
+        ? "Generating pattern... MiMo may take 1-3 minutes."
+        : "Generating pattern...");
+    setAiSketchMeta("");
+    generateAiSketchButton.disabled = true;
+    fetchAiSketchSuggestion({
+        model: aiModelSelect.value,
+        style: aiStyleSelect.value,
+        prompt: prompt,
+        bars: strudelBarsSelect.value,
+        bpm: strudelBpmInput.value
+    }).then(applyAiSketchSuggestion).catch(function (error) {
+        console.error(error);
+        setAiSketchStatus(aiSketchErrorMessage(error));
+    }).finally(function () {
+        generateAiSketchButton.disabled = false;
+    });
 }
 
 function bytesFromBase64(text) {
@@ -2471,6 +2557,29 @@ function strudelErrorMessage(error) {
     return message || "Sketch generation failed.";
 }
 
+function aiSketchErrorMessage(error) {
+    var message = error && error.message ? error.message : "";
+    if (message.indexOf("Failed to fetch") >= 0 || message.indexOf("NetworkError") >= 0) {
+        return "AI sketch service unavailable. Start Docker and retry.";
+    }
+    if (message.indexOf("API key is not configured") >= 0) {
+        return "Model key not configured in Docker environment.";
+    }
+    if (message.indexOf("not valid JSON") >= 0 || message.indexOf("JSON") >= 0) {
+        return "AI response was not valid JSON. Try again or switch model.";
+    }
+    if (message.indexOf("unsupported") >= 0 || message.indexOf("missing") >= 0) {
+        return "AI generated unsupported Strudel code. Try a simpler prompt.";
+    }
+    if (message.indexOf("mimo-v2.5-pro is still thinking") >= 0) {
+        return "MiMo timed out before final JSON. Try again or use a shorter prompt.";
+    }
+    if (message.indexOf("timed out") >= 0 || message.indexOf("still thinking") >= 0) {
+        return "AI sketch request timed out.";
+    }
+    return message || "AI sketch generation failed.";
+}
+
 conversionModeInputs.forEach(function (input) {
     input.onchange = function () {
         hideConversionResult();
@@ -2974,6 +3083,7 @@ window.onload = function () {
     loadCleanedMidiButton.onclick = loadCleanedMidi;
     createPresetMidiButton.onclick = createPresetMidi;
     loadPresetMidiButton.onclick = loadPresetMidi;
+    generateAiSketchButton.onclick = generateAiStrudelPattern;
     generateStrudelButton.onclick = generateStrudelSketch;
     previewStrudelButton.onclick = previewStrudelSketch;
     loadStrudelButton.onclick = loadStrudelSketchAsSource;

@@ -51,6 +51,28 @@ services:
       timeout: 5s
       retries: 12
 
+  ai-sketch-service:
+    build:
+      context: .
+      dockerfile: apps/ai-sketch-service/Dockerfile
+    environment:
+      AI_SKETCH_FRONTEND_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-pro}
+      XIAOMI_API_KEY: ${XIAOMI_API_KEY:-}
+      MIMO_API_KEY: ${MIMO_API_KEY:-}
+      MIMO_BASE_URL: ${MIMO_BASE_URL:-https://token-plan-cn.xiaomimimo.com/v1}
+      MIMO_MODEL: ${MIMO_MODEL:-mimo-v2.5-pro}
+    ports:
+      - "8092:8092"
+    working_dir: /workspace/ai-sketch
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8092/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   frontend:
     build:
       context: .

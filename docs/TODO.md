@@ -327,6 +327,13 @@ Chord sketch, and Minimal melody examples plus reset, tidy, and clear editor
 actions. Examples replace the editor content only; MIDI generation remains an
 explicit user action.
 
+AI Sketch status: V1 done for optional model-first prompt-to-pattern support.
+`deepseek-v4-pro` and `mimo-v2.5-pro` are routed through OpenAI-compatible Chat
+Completions inside a Docker sidecar. AI output is treated as editable Strudel
+source only; users still explicitly generate MIDI with the existing Sketch
+workflow. MiMo uses a compact sketch-spec builder internally, then local code
+compiles that spec into Strudel source for better reliability.
+
 Implementation scope:
 
 - Keep Piano ONNX as the default engine.
@@ -352,7 +359,11 @@ this backlog instead of being treated as the next required step:
    velocity range if users need more control over exported MIDI.
 2. Add a configurable Bass + Melody split point if arrangement sketches become
    a frequent workflow.
-3. Continue deeper Strudel editor polish only if code-to-MIDI sketching becomes
+3. Add AI explain/edit for existing Strudel code if users need iterative sketch
+   refinement after prompt-to-pattern works well.
+4. Explore MIDI-to-Strudel sketch summarization only after there is a clear
+   product use case for turning played/transcribed MIDI back into code.
+5. Continue deeper Strudel editor polish only if code-to-MIDI sketching becomes
    a frequent workflow; keep it separate from transcription claims.
-4. Keep MT3-style multi-instrument transcription as future research until there
+6. Keep MT3-style multi-instrument transcription as future research until there
    is a reproducible Docker prototype and a clear UI contract.
