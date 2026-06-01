@@ -152,20 +152,20 @@ Acceptance criteria:
 Goal: provide lightweight MIDI arrangement variants.
 
 Status: V1 done for Piano, Strings, Soft Synth, and Bass + Melody program
-presets, including browser preview with bundled preset soundfonts. More advanced
-splitting remains future work because it needs deliberate channel and note event
-rewriting.
+presets, including browser preview with bundled preset soundfonts and a
+configurable Bass + Melody split point. More advanced splitting remains future
+work because it needs deliberate channel and note event rewriting.
 
 Implementation scope:
 
 - Keep the current Piano, Strings, and Soft Synth presets as simple General MIDI
   program variants.
 - Implement V1 presets with MIDI program changes only.
-- Keep Bass + Melody V1 conservative: C4 split point, bass on channel 2, melody
-  on channel 1, and no chord detection.
+- Keep Bass + Melody V1 conservative: user-selected split point, bass on channel
+  2, melody on channel 1, and no chord detection.
 - Keep browser playback soundfont support limited to the bundled preset
   instruments.
-- Keep configurable split points or richer melody extraction as later work.
+- Keep richer melody extraction as later work.
 - Label the feature as presets or arrangement sketches, not full orchestration.
 
 Acceptance criteria:
@@ -173,6 +173,7 @@ Acceptance criteria:
 - Presets export valid MIDI files.
 - Presets can be previewed in the browser with bundled soundfonts.
 - Bass + Melody exports a separate MIDI variant without changing the source.
+- Bass + Melody can be regenerated with a user-selected split point.
 - Presets are reversible by returning to the original MIDI.
 - The UI makes clear that presets change playback/export mapping, not the source
   audio transcription model.
@@ -364,11 +365,9 @@ Acceptance criteria:
 The main V1 workflow is complete. Future work should be picked deliberately from
 this backlog instead of being treated as the next required step:
 
-1. Add a configurable Bass + Melody split point if arrangement sketches become
-   a frequent workflow.
-2. Explore MIDI-to-Strudel sketch summarization only after there is a clear
+1. Explore MIDI-to-Strudel sketch summarization only after there is a clear
    product use case for turning played/transcribed MIDI back into code.
-3. Continue deeper Strudel editor polish only if code-to-MIDI sketching becomes
+2. Continue deeper Strudel editor polish only if code-to-MIDI sketching becomes
    a frequent workflow; keep it separate from transcription claims.
-4. Keep MT3-style multi-instrument transcription as future research until there
+3. Keep MT3-style multi-instrument transcription as future research until there
    is a reproducible Docker prototype and a clear UI contract.

@@ -124,6 +124,8 @@ var cleanupVelocitySelect = document.getElementById("cleanup-velocity");
 var arrangementPresetSelect = document.getElementById("arrangement-preset");
 var melodySoundField = document.getElementById("melody-sound-field");
 var melodySoundSelect = document.getElementById("melody-sound");
+var bassSplitField = document.getElementById("bass-split-field");
+var bassSplitPointSelect = document.getElementById("bass-split-point");
 var createPresetMidiButton = document.getElementById("create-preset-midi-button");
 var downloadPresetMidiLink = document.getElementById("download-preset-midi-link");
 var loadPresetMidiButton = document.getElementById("load-preset-midi-button");
@@ -217,6 +219,12 @@ var arrangementPresets = {
     strings: { label: "Strings", program: 48, instrument: "string_ensemble_1" },
     "soft-synth": { label: "Soft Synth", program: 88, instrument: "pad_1_new_age" },
     "bass-melody": { label: "Bass + Melody", split: true, bassProgram: 32, bassInstrument: "acoustic_bass", splitPitch: 60 }
+};
+var bassMelodySplitPoints = {
+    57: { label: "A3", pitch: 57 },
+    60: { label: "C4", pitch: 60 },
+    64: { label: "E4", pitch: 64 },
+    67: { label: "G4", pitch: 67 }
 };
 var presetSoundfontInstruments = [
     arrangementPresets.piano.instrument,
@@ -1144,6 +1152,11 @@ function selectedMelodyPreset() {
     return arrangementPresets[melodySoundSelect.value] || arrangementPresets.strings;
 }
 
+function selectedBassMelodySplitPoint() {
+    var fallback = bassMelodySplitPoints[arrangementPresets["bass-melody"].splitPitch];
+    return bassMelodySplitPoints[bassSplitPointSelect.value] || fallback;
+}
+
 function selectedPresetLabel(preset) {
     if (!preset.split) {
         return preset.label;
@@ -1154,6 +1167,7 @@ function selectedPresetLabel(preset) {
 function updatePresetFields() {
     var preset = arrangementPresets[arrangementPresetSelect.value] || arrangementPresets.piano;
     melodySoundField.hidden = !preset.split;
+    bassSplitField.hidden = !preset.split;
 }
 
 function setStageTipsOpen(isOpen) {
@@ -1835,7 +1849,7 @@ function bassMelodyTrackBytes(sourceBytes, start, end, options, stats) {
     return output;
 }
 
-function createBassMelodyMidiBytes(sourceBytes, melodyProgram) {
+function createBassMelodyMidiBytes(sourceBytes, melodyProgram, splitPitch) {
     if (bytesToText(sourceBytes, 0, 4) !== "MThd") {
         throw new Error("Invalid MIDI header");
     }
@@ -1853,7 +1867,7 @@ function createBassMelodyMidiBytes(sourceBytes, melodyProgram) {
     var options = {
         melodyProgram: melodyProgram,
         bassProgram: bassPreset.bassProgram,
-        splitPitch: bassPreset.splitPitch
+        splitPitch: splitPitch || bassPreset.splitPitch
     };
     pushBytes(output, sourceBytes, 0, offset);
 
@@ -1916,9 +1930,10 @@ function createPresetMidi() {
 
     var preset = arrangementPresets[arrangementPresetSelect.value] || arrangementPresets.piano;
     var melodyPreset = selectedMelodyPreset();
+    var splitPoint = selectedBassMelodySplitPoint();
     try {
         var presetResult = preset.split
-            ? createBassMelodyMidiBytes(activeMidiBytes, melodyPreset.program)
+            ? createBassMelodyMidiBytes(activeMidiBytes, melodyPreset.program, splitPoint.pitch)
             : createPresetMidiBytes(activeMidiBytes, preset.program);
         var presetLabel = selectedPresetLabel(preset);
         resetPresetMidi();
@@ -1935,7 +1950,7 @@ function createPresetMidi() {
         if (preset.split) {
             presetStatus.textContent = presetLabel + " ready: "
                 + presetResult.stats.bassNotes + " bass notes, "
-                + presetResult.stats.melodyNotes + " melody notes. Split point: C4.";
+                + presetResult.stats.melodyNotes + " melody notes. Split point: " + splitPoint.label + ".";
         } else {
             presetStatus.textContent = preset.label + " preset ready: "
                 + presetResult.stats.programChangesInserted + " inserted, "
@@ -3219,6 +3234,9 @@ window.onload = function () {
         resetPresetMidi();
     };
     melodySoundSelect.onchange = function () {
+        resetPresetMidi();
+    };
+    bassSplitPointSelect.onchange = function () {
         resetPresetMidi();
     };
     timelineSlider.onpointerdown = beginTimelineSeek;

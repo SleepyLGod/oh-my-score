@@ -135,7 +135,8 @@ If conversion fails with a missing model error, confirm that
   bar/beat review, loop ranges, speed control, and interactive performance
   input are implemented.
 - Smart Score tools: MIDI analysis, source export, conservative cleanup, preset
-  variants, cleanup controls, and Bass + Melody sketches are implemented.
+  variants, cleanup controls, and configurable Bass + Melody sketches are
+  implemented.
 - Sketch mode: fixed-length Strudel pattern export, example patterns,
   lightweight editor actions, MIDI preview, source load, and download are
   implemented through a Docker-isolated sidecar.
