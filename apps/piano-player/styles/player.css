@@ -518,7 +518,7 @@ select {
 }
 .ai-action-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
 }
 .ai-sketch-status {
@@ -538,6 +538,23 @@ select {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
     margin: 0 0 12px;
+}
+.draft-console {
+    display: grid;
+    gap: 10px;
+    margin: 0 0 12px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+}
+.draft-console .field {
+    margin-top: 0;
+}
+.draft-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
 }
 .sketch-result {
     display: grid;
@@ -1091,14 +1108,14 @@ a {
     #upload-panel,
     #settings-panel {
         width: calc(50vw - 18px);
-        top: auto;
-        bottom: 142px;
+        top: 112px;
+        bottom: 252px;
         padding: 14px;
     }
     #sketch-panel {
         right: 12px;
         top: 112px;
-        bottom: 142px;
+        bottom: 252px;
         width: min(440px, calc(100vw - 24px));
         padding: 14px;
     }
@@ -1120,11 +1137,11 @@ a {
     }
     #copyright {
         right: 12px;
-        bottom: 138px;
+        bottom: 248px;
     }
     .stage-tips {
         left: 12px;
-        bottom: 150px;
+        bottom: 264px;
     }
     .stage-tips-popover {
         bottom: 52px;
@@ -1205,6 +1222,7 @@ a {
     .sketch-actions,
     .ai-sketch-grid,
     .ai-action-grid,
+    .draft-actions,
     .sketch-editor-actions {
         grid-template-columns: 1fr;
     }

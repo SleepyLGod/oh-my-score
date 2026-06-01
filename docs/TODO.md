@@ -328,6 +328,12 @@ Chord sketch, and Minimal melody examples plus reset, tidy, and clear editor
 actions. Examples replace the editor content only; MIDI generation remains an
 explicit user action.
 
+Strudel Workspace V2 status: V1 done for local draft controls and AI-assisted
+MIDI-to-Strudel sketching. The workspace can summarize the current source MIDI
+into a compact prompt for the AI sidecar, then replace the editor only after
+validated Strudel source is returned. This is a simplified sketch workflow, not
+exact MIDI reconstruction.
+
 AI Sketch status: V1 done for optional model-first prompt-to-pattern support.
 `deepseek-v4-pro` and `mimo-v2.5-pro` are routed through OpenAI-compatible Chat
 Completions inside a Docker sidecar. AI output is treated as editable Strudel
@@ -365,9 +371,7 @@ Acceptance criteria:
 The main V1 workflow is complete. Future work should be picked deliberately from
 this backlog instead of being treated as the next required step:
 
-1. Explore MIDI-to-Strudel sketch summarization only after there is a clear
-   product use case for turning played/transcribed MIDI back into code.
-2. Continue deeper Strudel editor polish only if code-to-MIDI sketching becomes
+1. Continue deeper Strudel editor polish only if code-to-MIDI sketching becomes
    a frequent workflow; keep it separate from transcription claims.
-3. Keep MT3-style multi-instrument transcription as future research until there
+2. Keep MT3-style multi-instrument transcription as future research until there
    is a reproducible Docker prototype and a clear UI contract.

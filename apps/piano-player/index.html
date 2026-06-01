@@ -185,6 +185,7 @@
                     </div>
                     <div class="ai-action-grid">
                         <button id="generate-ai-sketch-button" class="secondary-button" type="button">Generate Pattern</button>
+                        <button id="midi-to-strudel-button" class="secondary-button" type="button">From Current MIDI</button>
                         <button id="explain-ai-sketch-button" class="secondary-button" type="button">Explain Code</button>
                     </div>
                     <div class="field">
@@ -211,6 +212,19 @@
                     <button id="reset-strudel-example-button" class="secondary-button" type="button">Reset example</button>
                     <button id="tidy-strudel-button" class="secondary-button" type="button">Tidy</button>
                     <button id="clear-strudel-button" class="secondary-button" type="button">Clear</button>
+                </div>
+                <div class="draft-console">
+                    <div class="field">
+                        <label class="field-label" for="strudel-draft-select">Local draft</label>
+                        <select id="strudel-draft-select">
+                            <option value="">No saved drafts</option>
+                        </select>
+                    </div>
+                    <div class="draft-actions">
+                        <button id="save-strudel-draft-button" class="secondary-button" type="button">Save Draft</button>
+                        <button id="load-strudel-draft-button" class="secondary-button" type="button">Load Draft</button>
+                        <button id="duplicate-strudel-draft-button" class="secondary-button" type="button">Duplicate Draft</button>
+                    </div>
                 </div>
                 <div class="field">
                     <label class="field-label" for="strudel-code">Pattern</label>

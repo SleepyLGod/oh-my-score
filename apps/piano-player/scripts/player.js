@@ -57,10 +57,15 @@ var aiStyleSelect = document.getElementById("ai-style");
 var aiPromptInput = document.getElementById("ai-prompt");
 var aiEditPromptInput = document.getElementById("ai-edit-prompt");
 var generateAiSketchButton = document.getElementById("generate-ai-sketch-button");
+var midiToStrudelButton = document.getElementById("midi-to-strudel-button");
 var explainAiSketchButton = document.getElementById("explain-ai-sketch-button");
 var applyAiEditButton = document.getElementById("apply-ai-edit-button");
 var aiSketchStatus = document.getElementById("ai-sketch-status");
 var aiSketchMeta = document.getElementById("ai-sketch-meta");
+var strudelDraftSelect = document.getElementById("strudel-draft-select");
+var saveStrudelDraftButton = document.getElementById("save-strudel-draft-button");
+var loadStrudelDraftButton = document.getElementById("load-strudel-draft-button");
+var duplicateStrudelDraftButton = document.getElementById("duplicate-strudel-draft-button");
 var resetStrudelExampleButton = document.getElementById("reset-strudel-example-button");
 var tidyStrudelButton = document.getElementById("tidy-strudel-button");
 var clearStrudelButton = document.getElementById("clear-strudel-button");
@@ -138,6 +143,7 @@ var loopRangeStartSeconds = null;
 var loopRangeEndSeconds = null;
 var activePlaybackProgram = 0;
 var activePlaybackPrograms = null;
+var strudelDraftStorageKey = "oh-my-score:strudel-drafts:v1";
 var activePlaybackIsPreview = false;
 var previewRestoreState = null;
 var presetPlaybackOptions = null;
@@ -543,6 +549,130 @@ function loadStrudelExample(key, message) {
     resetStrudelResult(message || "Example loaded. Generate MIDI when ready.");
 }
 
+function readStrudelDrafts() {
+    try {
+        var rawDrafts = localStorage.getItem(strudelDraftStorageKey);
+        var parsedDrafts = rawDrafts ? JSON.parse(rawDrafts) : [];
+        return Array.isArray(parsedDrafts) ? parsedDrafts.filter(function (draft) {
+            return draft && typeof draft.source === "string";
+        }).slice(0, 12) : [];
+    } catch (error) {
+        console.warn(error);
+        return [];
+    }
+}
+
+function writeStrudelDrafts(drafts) {
+    try {
+        localStorage.setItem(strudelDraftStorageKey, JSON.stringify(drafts.slice(0, 12)));
+        return true;
+    } catch (error) {
+        console.warn(error);
+        setStrudelStatus("Unable to save local draft.");
+        return false;
+    }
+}
+
+function renderStrudelDrafts(selectedId) {
+    var drafts = readStrudelDrafts();
+    strudelDraftSelect.innerHTML = "";
+    if (!drafts.length) {
+        var emptyOption = document.createElement("option");
+        emptyOption.value = "";
+        emptyOption.textContent = "No saved drafts";
+        strudelDraftSelect.appendChild(emptyOption);
+        strudelDraftSelect.disabled = true;
+        loadStrudelDraftButton.disabled = true;
+        duplicateStrudelDraftButton.disabled = true;
+        return;
+    }
+    drafts.forEach(function (draft) {
+        var option = document.createElement("option");
+        option.value = draft.id;
+        option.textContent = draft.title;
+        strudelDraftSelect.appendChild(option);
+    });
+    strudelDraftSelect.disabled = false;
+    loadStrudelDraftButton.disabled = false;
+    duplicateStrudelDraftButton.disabled = false;
+    strudelDraftSelect.value = selectedId || drafts[0].id;
+}
+
+function newDraftTitle(prefix) {
+    var timestamp = new Date().toLocaleString([], {
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+    return prefix + " " + timestamp;
+}
+
+function saveStrudelDraft() {
+    var source = strudelCodeInput.value;
+    if (!source.trim()) {
+        setStrudelStatus("Add Strudel code before saving a draft.");
+        strudelCodeInput.focus();
+        return;
+    }
+    var drafts = readStrudelDrafts();
+    var selectedId = strudelDraftSelect.value;
+    var existingDraft = drafts.find(function (draft) {
+        return draft.id === selectedId;
+    });
+    var draft = existingDraft || {
+        id: String(Date.now()) + "-" + Math.random().toString(16).slice(2),
+        title: newDraftTitle("Sketch")
+    };
+    draft.source = source;
+    draft.updatedAt = new Date().toISOString();
+    if (!existingDraft) {
+        drafts.unshift(draft);
+    }
+    if (writeStrudelDrafts(drafts)) {
+        renderStrudelDrafts(draft.id);
+        resetStrudelResult("Draft saved locally.");
+    }
+}
+
+function loadStrudelDraft() {
+    var selectedId = strudelDraftSelect.value;
+    var draft = readStrudelDrafts().find(function (item) {
+        return item.id === selectedId;
+    });
+    if (!draft) {
+        setStrudelStatus("No local draft selected.");
+        return;
+    }
+    strudelCodeInput.value = draft.source;
+    resetStrudelResult("Draft loaded. Generate MIDI when ready.");
+}
+
+function duplicateStrudelDraft() {
+    var selectedId = strudelDraftSelect.value;
+    var sourceDraft = readStrudelDrafts().find(function (item) {
+        return item.id === selectedId;
+    });
+    var source = sourceDraft ? sourceDraft.source : strudelCodeInput.value;
+    if (!source.trim()) {
+        setStrudelStatus("No draft content to duplicate.");
+        return;
+    }
+    var copy = {
+        id: String(Date.now()) + "-" + Math.random().toString(16).slice(2),
+        title: newDraftTitle("Copy"),
+        source: source,
+        updatedAt: new Date().toISOString()
+    };
+    var drafts = readStrudelDrafts();
+    drafts.unshift(copy);
+    if (writeStrudelDrafts(drafts)) {
+        renderStrudelDrafts(copy.id);
+        strudelCodeInput.value = source;
+        resetStrudelResult("Draft duplicated locally.");
+    }
+}
+
 function tidyStrudelSource() {
     strudelCodeInput.value = strudelCodeInput.value
         .split("\n")
@@ -599,6 +729,10 @@ function fetchAiSketchRequest(path, payload) {
 
 function fetchAiSketchSuggestion(payload) {
     return fetchAiSketchRequest("/suggest", payload);
+}
+
+function fetchAiMidiSketch(payload) {
+    return fetchAiSketchRequest("/from-midi", payload);
 }
 
 function currentAiSourcePayload() {
@@ -711,6 +845,44 @@ function generateAiStrudelPattern() {
         setAiSketchStatus(aiSketchErrorMessage(error));
     }).finally(function () {
         generateAiSketchButton.disabled = false;
+    });
+}
+
+function generateStrudelFromCurrentMidi() {
+    if (!activeMidiBytes) {
+        setAiSketchStatus("Load a source MIDI before creating a sketch.");
+        return;
+    }
+    var summary;
+    try {
+        summary = midiSketchSummary(activeMidiBytes, {
+            bars: strudelBarsSelect.value,
+            bpm: Number(strudelBpmInput.value) || 120
+        });
+    } catch (error) {
+        console.warn(error);
+        setAiSketchStatus(error.message || "Unable to summarize current MIDI.");
+        return;
+    }
+    setAiSketchStatus(aiModelSelect.value === "mimo-v2.5-pro"
+        ? "Generating sketch from MIDI... MiMo may take 1-3 minutes."
+        : "Generating sketch from MIDI...");
+    setAiSketchMeta(summary.warnings.join(" "));
+    midiToStrudelButton.disabled = true;
+    fetchAiMidiSketch({
+        model: aiModelSelect.value,
+        style: aiStyleSelect.value,
+        bars: strudelBarsSelect.value,
+        bpm: summary.bpm,
+        midiSummary: summary
+    }).then(function (payload) {
+        applyAiSketchSuggestion(payload);
+        strudelBpmInput.value = String(summary.bpm);
+    }).catch(function (error) {
+        console.error(error);
+        setAiSketchStatus(aiSketchErrorMessage(error));
+    }).finally(function () {
+        midiToStrudelButton.disabled = false;
     });
 }
 
@@ -2087,6 +2259,184 @@ function parseMidiAnalysis(bytes) {
     };
 }
 
+function compactNoteSequence(notes, mode, maxItems) {
+    var groupedNotes = {};
+    notes.forEach(function (note) {
+        var beatKey = Math.round(note.startBeat * 2) / 2;
+        var key = String(beatKey);
+        var existing = groupedNotes[key];
+        if (!existing
+            || (mode === "melody" && note.pitch > existing.pitch)
+            || (mode === "bass" && note.pitch < existing.pitch)) {
+            groupedNotes[key] = note;
+        }
+    });
+    return Object.keys(groupedNotes).map(function (key) {
+        return groupedNotes[key];
+    }).sort(function (a, b) {
+        return a.startTick - b.startTick || a.pitch - b.pitch;
+    }).map(function (note) {
+        return midiNoteName(note.pitch);
+    }).filter(function (noteName, index, list) {
+        return index === 0 || noteName !== list[index - 1];
+    }).slice(0, maxItems);
+}
+
+function collectMidiSketchNotes(bytes, start, end, division, output) {
+    var state = { offset: start };
+    var runningStatus = null;
+    var tick = 0;
+    var activeNotes = {};
+
+    while (state.offset < end) {
+        tick += readVarLength(bytes, state, end);
+        output.maxTick = Math.max(output.maxTick, tick);
+        if (state.offset >= end) break;
+
+        var status = bytes[state.offset];
+        var dataOffset;
+        if (status < 0x80) {
+            if (runningStatus === null) {
+                throw new Error("MIDI running status found before status byte");
+            }
+            status = runningStatus;
+            dataOffset = state.offset;
+        } else {
+            state.offset += 1;
+            dataOffset = state.offset;
+            if (status < 0xf0) {
+                runningStatus = status;
+            }
+        }
+
+        if (status === 0xff) {
+            var metaType = bytes[state.offset];
+            state.offset += 1;
+            var metaLength = readVarLength(bytes, state, end);
+            if (metaType === 0x51 && metaLength === 3 && !output.bpm) {
+                var microsecondsPerQuarter = (bytes[state.offset] << 16) + (bytes[state.offset + 1] << 8) + bytes[state.offset + 2];
+                output.bpm = Math.round(60000000 / microsecondsPerQuarter);
+            } else if (metaType === 0x58 && metaLength >= 2 && !output.beatsPerBar) {
+                output.beatsPerBar = bytes[state.offset];
+            }
+            state.offset += metaLength;
+            continue;
+        }
+
+        if (status === 0xf0 || status === 0xf7) {
+            var sysexLength = readVarLength(bytes, state, end);
+            state.offset += sysexLength;
+            continue;
+        }
+
+        var dataLength = midiEventDataLength(status);
+        state.offset = dataOffset + dataLength;
+        var eventType = status & 0xf0;
+        var channel = (status & 0x0f) + 1;
+        var pitch = bytes[dataOffset];
+        var velocity = dataLength > 1 ? bytes[dataOffset + 1] : 0;
+        var key = channel + ":" + pitch;
+
+        if (eventType === 0x90 && velocity > 0 && channel !== 10) {
+            if (!activeNotes[key]) activeNotes[key] = [];
+            activeNotes[key].push({ pitch: pitch, startTick: tick, velocity: velocity, channel: channel });
+        } else if (eventType === 0x80 || (eventType === 0x90 && velocity === 0)) {
+            if (!activeNotes[key] || !activeNotes[key].length) continue;
+            var note = activeNotes[key].shift();
+            if (tick <= note.startTick) continue;
+            note.endTick = tick;
+            note.startBeat = division > 0 ? note.startTick / division : 0;
+            note.durationBeats = division > 0 ? (note.endTick - note.startTick) / division : 0;
+            output.notes.push(note);
+        }
+    }
+}
+
+function midiSketchSummary(bytes, options) {
+    options = options || {};
+    if (bytesToText(bytes, 0, 4) !== "MThd") {
+        throw new Error("Invalid MIDI header");
+    }
+    var headerLength = readUint32(bytes, 4);
+    var division = readUint16(bytes, 12);
+    if (division <= 0 || (division & 0x8000)) {
+        throw new Error("MIDI-to-Strudel needs ticks-per-quarter timing.");
+    }
+    var offset = 8 + headerLength;
+    var output = {
+        notes: [],
+        maxTick: 0,
+        bpm: 0,
+        beatsPerBar: 0
+    };
+
+    while (offset + 8 <= bytes.length) {
+        var chunkType = bytesToText(bytes, offset, 4);
+        var chunkLength = readUint32(bytes, offset + 4);
+        var chunkStart = offset + 8;
+        var chunkEnd = chunkStart + chunkLength;
+        if (chunkEnd > bytes.length) {
+            throw new Error("MIDI track chunk exceeds file length");
+        }
+        if (chunkType === "MTrk") {
+            collectMidiSketchNotes(bytes, chunkStart, chunkEnd, division, output);
+        }
+        offset = chunkEnd;
+    }
+
+    if (!output.notes.length) {
+        throw new Error("No MIDI notes available for Strudel sketching.");
+    }
+
+    var bars = Number(options.bars) === 4 || Number(options.bars) === 8 ? Number(options.bars) : 8;
+    var beatsPerBar = output.beatsPerBar || 4;
+    var maxBeat = bars * beatsPerBar;
+    var notesInRange = output.notes.filter(function (note) {
+        return note.startBeat < maxBeat;
+    });
+    if (!notesInRange.length) {
+        notesInRange = output.notes.slice();
+    }
+    var pitches = notesInRange.map(function (note) {
+        return note.pitch;
+    });
+    var minPitch = Math.min.apply(null, pitches);
+    var maxPitch = Math.max.apply(null, pitches);
+    var melodyNotes = compactNoteSequence(notesInRange.filter(function (note) {
+        return note.pitch >= 55;
+    }), "melody", 24);
+    var bassNotes = compactNoteSequence(notesInRange.filter(function (note) {
+        return note.pitch < 60;
+    }), "bass", 12);
+    if (!melodyNotes.length) {
+        melodyNotes = compactNoteSequence(notesInRange, "melody", 16);
+    }
+    if (!bassNotes.length) {
+        bassNotes = compactNoteSequence(notesInRange, "bass", 8);
+    }
+
+    var warnings = ["This is a simplified sketch summary, not an exact MIDI reconstruction."];
+    if (output.notes.length > notesInRange.length) {
+        warnings.push("Only the first " + bars + " bars were summarized.");
+    }
+    if (output.notes.length > 300) {
+        warnings.push("Dense MIDI was reduced to representative melody and bass notes.");
+    }
+
+    return {
+        title: sourceMidiTitle || activeSongTitle.textContent || "Current MIDI",
+        bpm: output.bpm || options.bpm || 120,
+        bars: bars,
+        beatsPerBar: beatsPerBar,
+        noteCount: output.notes.length,
+        summarizedNoteCount: notesInRange.length,
+        pitchRange: midiNoteName(minPitch) + "-" + midiNoteName(maxPitch),
+        melodyNotes: melodyNotes,
+        bassNotes: bassNotes,
+        warnings: warnings
+    };
+}
+
 function noteNameForOffset(offset) {
     var absoluteNote = controls.octave * 12 + offset;
     return noteNames[absoluteNote % 12] + Math.floor(absoluteNote / 12);
@@ -3190,6 +3540,7 @@ renderer.domElement.addEventListener("touchcancel", onPianoTouchEnd, true);
     
 window.onload = function () {
     loadStrudelExample(defaultStrudelExample, "Ready to sketch");
+    renderStrudelDrafts();
     setWorkspaceMode("transcribe");
     populateSongSelect();
     renderKeyboardMap();
@@ -3216,6 +3567,7 @@ window.onload = function () {
     createPresetMidiButton.onclick = createPresetMidi;
     loadPresetMidiButton.onclick = loadPresetMidi;
     generateAiSketchButton.onclick = generateAiStrudelPattern;
+    midiToStrudelButton.onclick = generateStrudelFromCurrentMidi;
     explainAiSketchButton.onclick = explainAiStrudelPattern;
     applyAiEditButton.onclick = editAiStrudelPattern;
     generateStrudelButton.onclick = generateStrudelSketch;
@@ -3227,6 +3579,9 @@ window.onload = function () {
     resetStrudelExampleButton.onclick = function () {
         loadStrudelExample(selectedStrudelExample());
     };
+    saveStrudelDraftButton.onclick = saveStrudelDraft;
+    loadStrudelDraftButton.onclick = loadStrudelDraft;
+    duplicateStrudelDraftButton.onclick = duplicateStrudelDraft;
     tidyStrudelButton.onclick = tidyStrudelSource;
     clearStrudelButton.onclick = clearStrudelSource;
     arrangementPresetSelect.onchange = function () {

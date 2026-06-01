@@ -137,14 +137,14 @@ If conversion fails with a missing model error, confirm that
 - Smart Score tools: MIDI analysis, source export, conservative cleanup, preset
   variants, cleanup controls, and configurable Bass + Melody sketches are
   implemented.
-- Sketch mode: fixed-length Strudel pattern export, example patterns,
-  lightweight editor actions, MIDI preview, source load, and download are
-  implemented through a Docker-isolated sidecar.
+- Sketch mode: fixed-length Strudel pattern export, example patterns, local
+  draft controls, MIDI preview, source load, and download are implemented
+  through a Docker-isolated sidecar.
 - Optional AI Sketch: `deepseek-v4-pro` and `mimo-v2.5-pro` can generate
   editable Strudel pattern drafts when the matching local API key is configured.
-  The same local sidecar can explain or edit the current Strudel code without
-  automatically generating MIDI. MiMo uses a compact sketch-spec builder
-  internally for reliability.
+  The same local sidecar can explain, edit, or summarize the current MIDI into
+  Strudel code without automatically generating MIDI. MiMo uses a compact
+  sketch-spec builder internally for reliability.
 - Development workflow: Docker isolation, frontend CI, backend CI, and GitHub
   Pages deploy are configured.
 

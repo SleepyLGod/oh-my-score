@@ -200,6 +200,19 @@ function normalizeEditPayload(payload) {
   return { ...base, instruction };
 }
 
+function normalizeMidiPayload(payload) {
+  const base = normalizeModelPayload(payload);
+  const summary = payload.midiSummary;
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+    throw new Error("MIDI summary is required.");
+  }
+  const summaryText = JSON.stringify(summary);
+  if (summaryText.length > 12000) {
+    throw new Error("MIDI summary is too large.");
+  }
+  return { ...base, task: "from-midi", midiSummary: summary };
+}
+
 function systemPrompt(options) {
   if (options.task === "explain") {
     return `You explain short Strudel code sketches for Oh-My-Score.
@@ -210,6 +223,14 @@ Explain what the pitch patterns do in plain language. Do not rewrite code. Do no
     return `You revise compact musical sketch plans for Oh-My-Score.
 Return one valid JSON object only, with keys: title, melodyNotes, bassNotes, explanation, warnings.
 melodyNotes and bassNotes must be arrays of pitch strings only, such as "D4", "F4", "A4".
+Use only note names A-G with optional # and octave 0-8. Do not use spaces, chords, rests, drums, samples, code, markdown, or prose outside JSON.
+Keep melodyNotes between 4 and 16 items. Keep bassNotes between 2 and 8 items.`;
+  }
+  if (options.task === "from-midi" && options.modelConfig.outputMode === "sketch-spec") {
+    return `You convert compact MIDI summaries into editable Strudel sketch plans for Oh-My-Score.
+Return one valid JSON object only, with keys: title, melodyNotes, bassNotes, explanation, warnings.
+melodyNotes and bassNotes must be arrays of pitch strings only, such as "D4", "F4", "A4".
+Use the supplied representative MIDI notes. Simplify dense music; do not claim exact reconstruction.
 Use only note names A-G with optional # and octave 0-8. Do not use spaces, chords, rests, drums, samples, code, markdown, or prose outside JSON.
 Keep melodyNotes between 4 and 16 items. Keep bassNotes between 2 and 8 items.`;
   }
@@ -232,6 +253,19 @@ Return one valid JSON object only, with keys: title, melodyNotes, bassNotes, exp
 melodyNotes and bassNotes must be arrays of pitch strings only, such as "D4", "F4", "A4".
 Use only note names A-G with optional # and octave 0-8. Do not use spaces, chords, rests, drums, samples, code, markdown, or prose outside JSON.
 Keep melodyNotes between 4 and 16 items. Keep bassNotes between 2 and 8 items.`;
+  }
+  if (options.task === "from-midi") {
+    return `You convert compact MIDI summaries into editable Strudel code sketches for Oh-My-Score.
+Return one valid JSON object only, with keys: title, source, explanation, warnings.
+The source must be JavaScript for offline MIDI export in Node.
+Allowed imports only:
+import { note } from "@strudel/core/controls.mjs";
+import { seq, stack } from "@strudel/core/pattern.mjs";
+The source must include export const metadata, export const pattern, and export default pattern.
+Use only note(...), seq(...), stack(...), .slow(number), and simple const declarations.
+Every pitch sequence must be wrapped as note(seq("C4", "E4", ...)); stack only note(...) pattern variables.
+Use the supplied representative MIDI notes. Simplify dense music; do not claim exact reconstruction.
+Do not use chord angle brackets, square-bracket mini-notation, samples, drums, Web MIDI, browser APIs, network APIs, eval, require, dynamic import, or filesystem/process APIs.`;
   }
   return `You generate short Strudel code sketches for Oh-My-Score.
 Return one valid JSON object only, with keys: title, source, explanation, warnings.
@@ -257,6 +291,17 @@ Return JSON only. Example shape:
 Source:
 ${options.source}`;
   }
+  if (options.task === "from-midi" && options.modelConfig.outputMode === "sketch-spec") {
+    return `Create a compact ${options.bars}-bar Strudel sketch plan from this MIDI summary at ${options.bpm} BPM.
+Style: ${options.style} (${styles[options.style]}).
+Use melodyNotes and bassNotes from the summary as the main material. Simplify rather than reconstructing every note.
+${options.retryInstruction || ""}
+MIDI summary:
+${JSON.stringify(options.midiSummary)}
+
+Return JSON only. Example shape:
+{"title":"Short title","melodyNotes":["D4","F4","A4","C5"],"bassNotes":["D2","A1","F2","G2"],"explanation":"One sentence.","warnings":["Simplified from MIDI summary."]}`;
+  }
   if (options.task === "edit" && options.modelConfig.outputMode === "sketch-spec") {
     return `Revise this ${options.bars}-bar MIDI sketch plan at ${options.bpm} BPM.
 Style: ${options.style} (${styles[options.style]}).
@@ -276,6 +321,17 @@ ${options.source}
 ${options.retryInstruction || ""}
 Return JSON only. Example shape:
 {"title":"Short title","source":"import ...","explanation":"One sentence.","warnings":["Any limitation, or empty array."]}`;
+  }
+  if (options.task === "from-midi") {
+    return `Create a ${options.bars}-bar Strudel MIDI sketch from this MIDI summary at ${options.bpm} BPM.
+Style: ${options.style} (${styles[options.style]}).
+Use the representative melody and bass notes from the summary. Simplify rather than reconstructing every note.
+${options.retryInstruction || ""}
+MIDI summary:
+${JSON.stringify(options.midiSummary)}
+
+Return JSON only. Example shape:
+{"title":"Short title","source":"import ...","explanation":"One sentence.","warnings":["Simplified from MIDI summary."]}`;
   }
   if (options.modelConfig.outputMode === "sketch-spec") {
     return `Create a compact ${options.bars}-bar MIDI sketch plan at ${options.bpm} BPM.
@@ -604,6 +660,38 @@ async function suggestSketch(payload) {
   throw lastError;
 }
 
+async function midiToStrudelSketch(payload) {
+  const options = normalizeMidiPayload(payload);
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const modelText = await callModel(options);
+      const parsedPayload = parseModelJson(modelText);
+      const suggestion = options.modelConfig.outputMode === "sketch-spec"
+        ? (() => {
+            const spec = validateSketchSpecShape(parsedPayload, options);
+            return { ...spec, source: buildStrudelSourceFromSketchSpec(spec) };
+          })()
+        : validateSuggestionShape(parsedPayload);
+      validateSourceGuardrails(suggestion.source);
+      await runSyntaxCheck(suggestion.source);
+      return {
+        ...suggestion,
+        model: options.modelConfig.model,
+        transport: options.modelConfig.transport
+      };
+    } catch (error) {
+      lastError = error;
+      const retryable = /AI-generated|valid JSON|did not include Strudel source|sketch spec/.test(error.message || "");
+      if (!retryable || attempt > 0) break;
+      options.retryInstruction = options.modelConfig.outputMode === "sketch-spec"
+        ? `Previous attempt was rejected: ${error.message}. Regenerate valid JSON with melodyNotes and bassNotes arrays of single pitch strings from the MIDI summary.`
+        : `Previous attempt was rejected: ${error.message}. Regenerate with only simple note(seq("C4", "D4")) pitch patterns and valid JSON.`;
+    }
+  }
+  throw lastError;
+}
+
 async function explainSketch(payload) {
   const options = normalizeSourcePayload(payload, "explain");
   validateSourceGuardrails(options.source);
@@ -680,6 +768,17 @@ async function handleRequest(request, response) {
       sendJson(request, response, 200, await explainSketch(payload));
     } catch (error) {
       sendJson(request, response, error.statusCode || 400, { error: error.message || "AI sketch explanation failed." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && request.url === "/from-midi") {
+    try {
+      requireAllowedOrigin(request);
+      const payload = await readJsonBody(request);
+      sendJson(request, response, 200, await midiToStrudelSketch(payload));
+    } catch (error) {
+      sendJson(request, response, error.statusCode || 400, { error: error.message || "AI MIDI-to-Strudel generation failed." });
     }
     return;
   }
