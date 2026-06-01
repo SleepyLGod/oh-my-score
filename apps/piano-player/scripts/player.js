@@ -118,6 +118,9 @@ var cleanMidiButton = document.getElementById("clean-midi-button");
 var downloadCleanedMidiLink = document.getElementById("download-cleaned-midi-link");
 var loadCleanedMidiButton = document.getElementById("load-cleaned-midi-button");
 var cleanupStatus = document.getElementById("cleanup-status");
+var cleanupShortNoteSelect = document.getElementById("cleanup-short-note");
+var cleanupDuplicatesInput = document.getElementById("cleanup-duplicates");
+var cleanupVelocitySelect = document.getElementById("cleanup-velocity");
 var arrangementPresetSelect = document.getElementById("arrangement-preset");
 var melodySoundField = document.getElementById("melody-sound-field");
 var melodySoundSelect = document.getElementById("melody-sound");
@@ -1269,9 +1272,25 @@ function midiEventDataLength(status) {
     return 0;
 }
 
-function normalizeVelocity(velocity) {
+function cleanupOptions() {
+    return {
+        shortNoteDivisor: cleanupShortNoteSelect.value === "off" ? 0 : Number(cleanupShortNoteSelect.value) || 32,
+        removeDuplicates: cleanupDuplicatesInput.checked,
+        velocityMode: cleanupVelocitySelect.value || "moderate"
+    };
+}
+
+function cleanupVelocityRange(mode) {
+    if (mode === "strong") return { min: 64, max: 100 };
+    if (mode === "moderate") return { min: 56, max: 108 };
+    return null;
+}
+
+function normalizeVelocity(velocity, mode) {
     if (velocity <= 0) return velocity;
-    return Math.max(56, Math.min(108, velocity));
+    var range = cleanupVelocityRange(mode);
+    if (!range) return velocity;
+    return Math.max(range.min, Math.min(range.max, velocity));
 }
 
 function addPolyphonyEvent(polyphonyEvents, activeNotes, tick, channel, noteNumber, delta) {
@@ -1432,13 +1451,15 @@ function popSplitChannel(activeNotes, key, fallbackChannel) {
     return activeNotes[key].pop();
 }
 
-function cleanMidiTrack(sourceBytes, cleanedBytes, start, end, division, stats) {
+function cleanMidiTrack(sourceBytes, cleanedBytes, start, end, division, options, stats) {
     var state = { offset: start };
     var runningStatus = null;
     var tick = 0;
     var activeNotes = {};
     var ticksPerQuarter = division > 0 && !(division & 0x8000) ? division : 480;
-    var shortNoteThreshold = Math.max(1, Math.round(ticksPerQuarter / 32));
+    var shortNoteThreshold = options.shortNoteDivisor > 0
+        ? Math.max(1, Math.round(ticksPerQuarter / options.shortNoteDivisor))
+        : 0;
 
     while (state.offset < end) {
         tick += readVarLength(sourceBytes, state, end);
@@ -1485,12 +1506,12 @@ function cleanMidiTrack(sourceBytes, cleanedBytes, start, end, division, stats) 
 
         if (eventType === 0x90 && velocity > 0) {
             stats.notesSeen += 1;
-            var normalizedVelocity = normalizeVelocity(velocity);
+            var normalizedVelocity = normalizeVelocity(velocity, options.velocityMode);
             if (cleanedBytes[velocityOffset] !== normalizedVelocity) {
                 stats.velocitiesNormalized += 1;
                 cleanedBytes[velocityOffset] = normalizedVelocity;
             }
-            var isDuplicateOverlap = activeNotes[key] && activeNotes[key].length > 0;
+            var isDuplicateOverlap = options.removeDuplicates && activeNotes[key] && activeNotes[key].length > 0;
             if (isDuplicateOverlap) {
                 cleanedBytes[velocityOffset] = 0;
                 stats.duplicateOverlapsRemoved += 1;
@@ -1503,7 +1524,7 @@ function cleanMidiTrack(sourceBytes, cleanedBytes, start, end, division, stats) 
         } else if (eventType === 0x80 || (eventType === 0x90 && velocity === 0)) {
             var noteOn = popActiveNote(activeNotes, key);
             if (!noteOn || noteOn.muted) continue;
-            if (tick - noteOn.startTick > 0 && tick - noteOn.startTick < shortNoteThreshold) {
+            if (shortNoteThreshold > 0 && tick - noteOn.startTick > 0 && tick - noteOn.startTick < shortNoteThreshold) {
                 cleanedBytes[noteOn.velocityOffset] = 0;
                 stats.shortNotesRemoved += 1;
             }
@@ -1511,7 +1532,7 @@ function cleanMidiTrack(sourceBytes, cleanedBytes, start, end, division, stats) 
     }
 }
 
-function cleanMidiBytes(sourceBytes) {
+function cleanMidiBytes(sourceBytes, options) {
     if (bytesToText(sourceBytes, 0, 4) !== "MThd") {
         throw new Error("Invalid MIDI header");
     }
@@ -1536,7 +1557,7 @@ function cleanMidiBytes(sourceBytes) {
             throw new Error("MIDI track chunk exceeds file length");
         }
         if (chunkType === "MTrk") {
-            cleanMidiTrack(sourceBytes, cleanedBytes, chunkStart, chunkEnd, division, stats);
+            cleanMidiTrack(sourceBytes, cleanedBytes, chunkStart, chunkEnd, division, options, stats);
         }
         offset = chunkEnd;
     }
@@ -1867,7 +1888,8 @@ function cleanActiveMidi() {
     if (!activeMidiBytes) return;
 
     try {
-        var cleaned = cleanMidiBytes(activeMidiBytes);
+        var options = cleanupOptions();
+        var cleaned = cleanMidiBytes(activeMidiBytes, options);
         resetCleanedMidi();
         cleanedMidiBytes = new Uint8Array(cleaned.bytes);
         cleanedMidiUrl = URL.createObjectURL(new Blob([cleaned.bytes], { type: "audio/midi" }));
@@ -1883,6 +1905,10 @@ function cleanActiveMidi() {
         console.warn(error);
         resetCleanedMidi("Cleanup unavailable for this MIDI file.");
     }
+}
+
+function resetCleanupVariantOnOptionChange() {
+    resetCleanedMidi("Cleanup settings changed. Run Clean MIDI again.");
 }
 
 function createPresetMidi() {
@@ -3168,6 +3194,9 @@ window.onload = function () {
     stopButton.onclick = controls.stop;
     restartButton.onclick = restartPlayback;
     cleanMidiButton.onclick = cleanActiveMidi;
+    cleanupShortNoteSelect.onchange = resetCleanupVariantOnOptionChange;
+    cleanupDuplicatesInput.onchange = resetCleanupVariantOnOptionChange;
+    cleanupVelocitySelect.onchange = resetCleanupVariantOnOptionChange;
     loadCleanedMidiButton.onclick = loadCleanedMidi;
     createPresetMidiButton.onclick = createPresetMidi;
     loadPresetMidiButton.onclick = loadPresetMidi;

@@ -466,6 +466,25 @@ select {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
 }
+.cleanup-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin: 12px 0;
+}
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    color: var(--text);
+    font-size: 13px;
+}
+.checkbox-row input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+}
 .sketch-controls {
     display: grid;
     grid-template-columns: 1fr 1fr;

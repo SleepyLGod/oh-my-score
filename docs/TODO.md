@@ -339,6 +339,10 @@ code or apply a user-requested edit through the same local AI sidecar. Edits
 replace the editor content only after source validation; MIDI generation remains
 an explicit user action.
 
+Cleanup controls status: V1 done. Smart Score cleanup now exposes short-note,
+duplicate-overlap, and velocity normalization controls while preserving the
+previous default behavior and keeping cleaned MIDI as a separate variant.
+
 Implementation scope:
 
 - Keep Piano ONNX as the default engine.
@@ -360,13 +364,11 @@ Acceptance criteria:
 The main V1 workflow is complete. Future work should be picked deliberately from
 this backlog instead of being treated as the next required step:
 
-1. Add cleanup controls for short-note threshold, duplicate strictness, and
-   velocity range if users need more control over exported MIDI.
-2. Add a configurable Bass + Melody split point if arrangement sketches become
+1. Add a configurable Bass + Melody split point if arrangement sketches become
    a frequent workflow.
-3. Explore MIDI-to-Strudel sketch summarization only after there is a clear
+2. Explore MIDI-to-Strudel sketch summarization only after there is a clear
    product use case for turning played/transcribed MIDI back into code.
-4. Continue deeper Strudel editor polish only if code-to-MIDI sketching becomes
+3. Continue deeper Strudel editor polish only if code-to-MIDI sketching becomes
    a frequent workflow; keep it separate from transcription claims.
-5. Keep MT3-style multi-instrument transcription as future research until there
+4. Keep MT3-style multi-instrument transcription as future research until there
    is a reproducible Docker prototype and a clear UI contract.

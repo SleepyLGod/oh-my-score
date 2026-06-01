@@ -289,6 +289,28 @@
                     <div class="export-actions">
                         <a id="download-source-midi-link" class="secondary-button" href="#" download hidden>Download Source MIDI</a>
                     </div>
+                    <div class="cleanup-controls" aria-label="Cleanup controls">
+                        <div class="field">
+                            <label class="field-label" for="cleanup-short-note">Short notes</label>
+                            <select id="cleanup-short-note">
+                                <option value="off">Keep all</option>
+                                <option value="32" selected>Remove &lt; 1/32 beat</option>
+                                <option value="16">Remove &lt; 1/16 beat</option>
+                            </select>
+                        </div>
+                        <label class="checkbox-row">
+                            <input id="cleanup-duplicates" type="checkbox" checked>
+                            <span>Remove overlaps</span>
+                        </label>
+                        <div class="field">
+                            <label class="field-label" for="cleanup-velocity">Velocity</label>
+                            <select id="cleanup-velocity">
+                                <option value="off">Keep original</option>
+                                <option value="moderate" selected>Normalize 56-108</option>
+                                <option value="strong">Normalize 64-100</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="cleanup-actions">
                         <button id="clean-midi-button" class="secondary-button" type="button" disabled>Clean MIDI</button>
                         <a id="download-cleaned-midi-link" class="secondary-button" href="#" download hidden>Download Cleaned MIDI</a>
