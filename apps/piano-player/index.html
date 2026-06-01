@@ -183,7 +183,15 @@
                         <label class="field-label" for="ai-prompt">Prompt</label>
                         <textarea id="ai-prompt" class="compact-textarea" spellcheck="true" placeholder="Gentle arpeggio in D minor with a warm bass movement"></textarea>
                     </div>
-                    <button id="generate-ai-sketch-button" class="secondary-button" type="button">Generate Pattern</button>
+                    <div class="ai-action-grid">
+                        <button id="generate-ai-sketch-button" class="secondary-button" type="button">Generate Pattern</button>
+                        <button id="explain-ai-sketch-button" class="secondary-button" type="button">Explain Code</button>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="ai-edit-prompt">Edit prompt</label>
+                        <textarea id="ai-edit-prompt" class="compact-textarea" spellcheck="true" placeholder="Make it darker, slower, and simpler"></textarea>
+                    </div>
+                    <button id="apply-ai-edit-button" class="secondary-button" type="button">Apply Edit</button>
                     <div class="convert-status ai-sketch-status">
                         <span class="field-label">AI</span>
                         <span id="ai-sketch-status">Optional local AI service</span>

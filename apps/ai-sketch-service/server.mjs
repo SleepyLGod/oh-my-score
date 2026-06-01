@@ -143,6 +143,18 @@ function modelStatus() {
 }
 
 function normalizeSuggestPayload(payload) {
+  const base = normalizeModelPayload(payload);
+  const prompt = String(payload.prompt || "").trim();
+  if (!prompt) {
+    throw new Error("Describe the sketch you want to generate.");
+  }
+  if (prompt.length > MAX_PROMPT_CHARS) {
+    throw new Error("Prompt is too long.");
+  }
+  return { ...base, task: "suggest", prompt };
+}
+
+function normalizeModelPayload(payload) {
   const modelId = typeof payload.model === "string" ? payload.model : "deepseek-v4-pro";
   const modelConfig = models[modelId];
   if (!modelConfig) {
@@ -156,23 +168,64 @@ function normalizeSuggestPayload(payload) {
     throw error;
   }
 
-  const prompt = String(payload.prompt || "").trim();
-  if (!prompt) {
-    throw new Error("Describe the sketch you want to generate.");
-  }
-  if (prompt.length > MAX_PROMPT_CHARS) {
-    throw new Error("Prompt is too long.");
-  }
-
   const style = styles[payload.style] ? payload.style : "ambient";
   const requestedBars = Number(payload.bars);
   const bars = requestedBars === 4 || requestedBars === 8 ? requestedBars : 8;
   const bpmNumber = Number(payload.bpm);
   const bpm = Number.isFinite(bpmNumber) ? Math.max(40, Math.min(240, bpmNumber)) : 120;
-  return { modelId, modelConfig, prompt, style, bars, bpm };
+  return { modelId, modelConfig, style, bars, bpm };
+}
+
+function normalizeSourcePayload(payload, task) {
+  const base = normalizeModelPayload(payload);
+  const source = String(payload.source || "").trim();
+  if (!source) {
+    throw new Error("Strudel source is required.");
+  }
+  if (source.length > MAX_SOURCE_CHARS) {
+    throw new Error("Strudel source is too long.");
+  }
+  return { ...base, task, source: `${source}\n` };
+}
+
+function normalizeEditPayload(payload) {
+  const base = normalizeSourcePayload(payload, "edit");
+  const instruction = String(payload.instruction || "").trim();
+  if (!instruction) {
+    throw new Error("Describe how to edit the sketch.");
+  }
+  if (instruction.length > MAX_PROMPT_CHARS) {
+    throw new Error("Edit prompt is too long.");
+  }
+  return { ...base, instruction };
 }
 
 function systemPrompt(options) {
+  if (options.task === "explain") {
+    return `You explain short Strudel code sketches for Oh-My-Score.
+Return one valid JSON object only, with keys: explanation, structure, warnings.
+Explain what the pitch patterns do in plain language. Do not rewrite code. Do not suggest unsupported drums, samples, Web MIDI, or browser APIs.`;
+  }
+  if (options.task === "edit" && options.modelConfig.outputMode === "sketch-spec") {
+    return `You revise compact musical sketch plans for Oh-My-Score.
+Return one valid JSON object only, with keys: title, melodyNotes, bassNotes, explanation, warnings.
+melodyNotes and bassNotes must be arrays of pitch strings only, such as "D4", "F4", "A4".
+Use only note names A-G with optional # and octave 0-8. Do not use spaces, chords, rests, drums, samples, code, markdown, or prose outside JSON.
+Keep melodyNotes between 4 and 16 items. Keep bassNotes between 2 and 8 items.`;
+  }
+  if (options.task === "edit") {
+    return `You revise short Strudel code sketches for Oh-My-Score.
+Return one valid JSON object only, with keys: title, source, explanation, warnings.
+The source must be JavaScript for offline MIDI export in Node.
+Allowed imports only:
+import { note } from "@strudel/core/controls.mjs";
+import { seq, stack } from "@strudel/core/pattern.mjs";
+The source must include export const metadata, export const pattern, and export default pattern.
+Use only note(...), seq(...), stack(...), .slow(number), and simple const declarations.
+Every pitch sequence must be wrapped as note(seq("C4", "E4", ...)); stack only note(...) pattern variables.
+Each seq(...) item must be a single pitch string, for example seq("D4", "F4", "A4"), not seq("D4 F4").
+Do not use chord angle brackets, square-bracket mini-notation, samples, drums, Web MIDI, browser APIs, network APIs, eval, require, dynamic import, or filesystem/process APIs.`;
+  }
   if (options.modelConfig.outputMode === "sketch-spec") {
     return `You create compact musical sketch plans for Oh-My-Score.
 Return one valid JSON object only, with keys: title, melodyNotes, bassNotes, explanation, warnings.
@@ -196,6 +249,34 @@ Keep the pattern readable and editable.`;
 }
 
 function userPrompt(options) {
+  if (options.task === "explain") {
+    return `Explain this Strudel sketch at ${options.bpm} BPM over ${options.bars} bars.
+Return JSON only. Example shape:
+{"explanation":"One concise paragraph.","structure":["Melody uses ...","Bass uses ..."],"warnings":["Any limitation, or empty array."]}
+
+Source:
+${options.source}`;
+  }
+  if (options.task === "edit" && options.modelConfig.outputMode === "sketch-spec") {
+    return `Revise this ${options.bars}-bar MIDI sketch plan at ${options.bpm} BPM.
+Style: ${options.style} (${styles[options.style]}).
+Edit request: ${options.instruction}
+Current source for context:
+${options.source}
+${options.retryInstruction || ""}
+Return JSON only. Example shape:
+{"title":"Short title","melodyNotes":["D4","F4","A4","C5"],"bassNotes":["D2","A1","F2","G2"],"explanation":"One sentence.","warnings":["Any limitation, or empty array."]}`;
+  }
+  if (options.task === "edit") {
+    return `Revise this ${options.bars}-bar Strudel MIDI sketch at ${options.bpm} BPM.
+Style: ${options.style} (${styles[options.style]}).
+Edit request: ${options.instruction}
+Current source:
+${options.source}
+${options.retryInstruction || ""}
+Return JSON only. Example shape:
+{"title":"Short title","source":"import ...","explanation":"One sentence.","warnings":["Any limitation, or empty array."]}`;
+  }
   if (options.modelConfig.outputMode === "sketch-spec") {
     return `Create a compact ${options.bars}-bar MIDI sketch plan at ${options.bpm} BPM.
 Style: ${options.style} (${styles[options.style]}).
@@ -360,6 +441,23 @@ function validateSketchSpecShape(payload, options) {
   };
 }
 
+function validateExplanationShape(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("AI explanation JSON must be an object.");
+  }
+  const explanation = String(payload.explanation || "").trim().slice(0, 900);
+  const structure = Array.isArray(payload.structure)
+    ? payload.structure.map((item) => String(item).trim()).filter(Boolean).slice(0, 5)
+    : [];
+  const warnings = Array.isArray(payload.warnings)
+    ? payload.warnings.map((item) => String(item).trim()).filter(Boolean).slice(0, 4)
+    : [];
+  if (!explanation) {
+    throw new Error("AI response did not include an explanation.");
+  }
+  return { explanation, structure, warnings };
+}
+
 function buildStrudelSourceFromSketchSpec(spec) {
   const melodyItems = spec.melodyNotes.map((note) => JSON.stringify(note)).join(", ");
   const bassItems = spec.bassNotes.map((note) => JSON.stringify(note)).join(", ");
@@ -506,6 +604,52 @@ async function suggestSketch(payload) {
   throw lastError;
 }
 
+async function explainSketch(payload) {
+  const options = normalizeSourcePayload(payload, "explain");
+  validateSourceGuardrails(options.source);
+  await runSyntaxCheck(options.source);
+  const modelText = await callModel(options);
+  return {
+    ...validateExplanationShape(parseModelJson(modelText)),
+    model: options.modelConfig.model,
+    transport: options.modelConfig.transport
+  };
+}
+
+async function editSketch(payload) {
+  const options = normalizeEditPayload(payload);
+  validateSourceGuardrails(options.source);
+  await runSyntaxCheck(options.source);
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const modelText = await callModel(options);
+      const parsedPayload = parseModelJson(modelText);
+      const suggestion = options.modelConfig.outputMode === "sketch-spec"
+        ? (() => {
+            const spec = validateSketchSpecShape(parsedPayload, options);
+            return { ...spec, source: buildStrudelSourceFromSketchSpec(spec) };
+          })()
+        : validateSuggestionShape(parsedPayload);
+      validateSourceGuardrails(suggestion.source);
+      await runSyntaxCheck(suggestion.source);
+      return {
+        ...suggestion,
+        model: options.modelConfig.model,
+        transport: options.modelConfig.transport
+      };
+    } catch (error) {
+      lastError = error;
+      const retryable = /AI-generated|valid JSON|did not include Strudel source|sketch spec/.test(error.message || "");
+      if (!retryable || attempt > 0) break;
+      options.retryInstruction = options.modelConfig.outputMode === "sketch-spec"
+        ? `Previous attempt was rejected: ${error.message}. Regenerate valid JSON with melodyNotes and bassNotes arrays of single pitch strings like "C4".`
+        : `Previous attempt was rejected: ${error.message}. Regenerate with only simple note(seq("C4", "D4")) pitch patterns and valid JSON.`;
+    }
+  }
+  throw lastError;
+}
+
 async function handleRequest(request, response) {
   if (request.method === "OPTIONS") {
     response.writeHead(requestOrigin(request) ? 204 : 403, corsHeaders(request));
@@ -525,6 +669,28 @@ async function handleRequest(request, response) {
       sendJson(request, response, 200, await suggestSketch(payload));
     } catch (error) {
       sendJson(request, response, error.statusCode || 400, { error: error.message || "AI sketch generation failed." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && request.url === "/explain") {
+    try {
+      requireAllowedOrigin(request);
+      const payload = await readJsonBody(request);
+      sendJson(request, response, 200, await explainSketch(payload));
+    } catch (error) {
+      sendJson(request, response, error.statusCode || 400, { error: error.message || "AI sketch explanation failed." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && request.url === "/edit") {
+    try {
+      requireAllowedOrigin(request);
+      const payload = await readJsonBody(request);
+      sendJson(request, response, 200, await editSketch(payload));
+    } catch (error) {
+      sendJson(request, response, error.statusCode || 400, { error: error.message || "AI sketch edit failed." });
     }
     return;
   }

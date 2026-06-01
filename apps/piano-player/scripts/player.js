@@ -55,7 +55,10 @@ var strudelBpmInput = document.getElementById("strudel-bpm");
 var aiModelSelect = document.getElementById("ai-model");
 var aiStyleSelect = document.getElementById("ai-style");
 var aiPromptInput = document.getElementById("ai-prompt");
+var aiEditPromptInput = document.getElementById("ai-edit-prompt");
 var generateAiSketchButton = document.getElementById("generate-ai-sketch-button");
+var explainAiSketchButton = document.getElementById("explain-ai-sketch-button");
+var applyAiEditButton = document.getElementById("apply-ai-edit-button");
 var aiSketchStatus = document.getElementById("ai-sketch-status");
 var aiSketchMeta = document.getElementById("ai-sketch-meta");
 var resetStrudelExampleButton = document.getElementById("reset-strudel-example-button");
@@ -559,11 +562,15 @@ function aiSketchJsonError(response, payload) {
     throw new Error("HTTP " + response.status + ": " + (message || "AI sketch request failed."));
 }
 
-function fetchAiSketchSuggestion(payload) {
+function aiSketchEndpoint(path) {
+    return aiSketchApiUrl.replace(/\/suggest$/, "") + path;
+}
+
+function fetchAiSketchRequest(path, payload) {
     if (!aiSketchApiUrl) {
         return Promise.reject(new Error("AI sketch needs local Docker service."));
     }
-    return fetch(aiSketchApiUrl, {
+    return fetch(aiSketchEndpoint(path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -579,6 +586,20 @@ function fetchAiSketchSuggestion(payload) {
     });
 }
 
+function fetchAiSketchSuggestion(payload) {
+    return fetchAiSketchRequest("/suggest", payload);
+}
+
+function currentAiSourcePayload() {
+    return {
+        model: aiModelSelect.value,
+        source: strudelCodeInput.value,
+        style: aiStyleSelect.value,
+        bars: strudelBarsSelect.value,
+        bpm: strudelBpmInput.value
+    };
+}
+
 function applyAiSketchSuggestion(payload) {
     strudelCodeInput.value = payload.source || "";
     resetStrudelResult("AI pattern ready. Review code, then Generate MIDI.");
@@ -587,6 +608,73 @@ function applyAiSketchSuggestion(payload) {
         : "";
     setAiSketchMeta((payload.explanation || "Pattern generated.") + warningText);
     setAiSketchStatus("Generated with " + (payload.model || "model"));
+}
+
+function applyAiExplanation(payload) {
+    var structureText = Array.isArray(payload.structure) && payload.structure.length
+        ? " Structure: " + payload.structure.join(" ")
+        : "";
+    var warningText = Array.isArray(payload.warnings) && payload.warnings.length
+        ? " Warnings: " + payload.warnings.join(" ")
+        : "";
+    setAiSketchMeta((payload.explanation || "Explanation ready.") + structureText + warningText);
+    setAiSketchStatus("Explained with " + (payload.model || "model"));
+}
+
+function explainAiStrudelPattern() {
+    if (!strudelCodeInput.value.trim()) {
+        setAiSketchStatus("Add Strudel code first.");
+        strudelCodeInput.focus();
+        return;
+    }
+    setAiSketchStatus(aiModelSelect.value === "mimo-v2.5-pro"
+        ? "Explaining code... MiMo may take 1-3 minutes."
+        : "Explaining code...");
+    setAiSketchMeta("");
+    explainAiSketchButton.disabled = true;
+    fetchAiSketchRequest("/explain", currentAiSourcePayload()).then(applyAiExplanation).catch(function (error) {
+        console.error(error);
+        setAiSketchStatus(aiSketchErrorMessage(error));
+    }).finally(function () {
+        explainAiSketchButton.disabled = false;
+    });
+}
+
+function applyAiEdit(payload) {
+    strudelCodeInput.value = payload.source || "";
+    resetStrudelResult("AI edit applied. Review code, then Generate MIDI.");
+    var warningText = Array.isArray(payload.warnings) && payload.warnings.length
+        ? " Warnings: " + payload.warnings.join(" ")
+        : "";
+    setAiSketchMeta((payload.explanation || "Edit applied.") + warningText);
+    setAiSketchStatus("Edited with " + (payload.model || "model"));
+}
+
+function editAiStrudelPattern() {
+    var instruction = aiEditPromptInput.value.trim();
+    if (!strudelCodeInput.value.trim()) {
+        setAiSketchStatus("Add Strudel code first.");
+        strudelCodeInput.focus();
+        return;
+    }
+    if (!instruction) {
+        setAiSketchStatus("Describe the edit first.");
+        aiEditPromptInput.focus();
+        return;
+    }
+    setAiSketchStatus(aiModelSelect.value === "mimo-v2.5-pro"
+        ? "Applying edit... MiMo may take 1-3 minutes."
+        : "Applying edit...");
+    setAiSketchMeta("");
+    applyAiEditButton.disabled = true;
+    var payload = currentAiSourcePayload();
+    payload.instruction = instruction;
+    fetchAiSketchRequest("/edit", payload).then(applyAiEdit).catch(function (error) {
+        console.error(error);
+        setAiSketchStatus(aiSketchErrorMessage(error));
+    }).finally(function () {
+        applyAiEditButton.disabled = false;
+    });
 }
 
 function generateAiStrudelPattern() {
@@ -3084,6 +3172,8 @@ window.onload = function () {
     createPresetMidiButton.onclick = createPresetMidi;
     loadPresetMidiButton.onclick = loadPresetMidi;
     generateAiSketchButton.onclick = generateAiStrudelPattern;
+    explainAiSketchButton.onclick = explainAiStrudelPattern;
+    applyAiEditButton.onclick = editAiStrudelPattern;
     generateStrudelButton.onclick = generateStrudelSketch;
     previewStrudelButton.onclick = previewStrudelSketch;
     loadStrudelButton.onclick = loadStrudelSketchAsSource;

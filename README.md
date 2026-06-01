@@ -141,7 +141,9 @@ If conversion fails with a missing model error, confirm that
   implemented through a Docker-isolated sidecar.
 - Optional AI Sketch: `deepseek-v4-pro` and `mimo-v2.5-pro` can generate
   editable Strudel pattern drafts when the matching local API key is configured.
-  MiMo uses a compact sketch-spec builder internally for reliability.
+  The same local sidecar can explain or edit the current Strudel code without
+  automatically generating MIDI. MiMo uses a compact sketch-spec builder
+  internally for reliability.
 - Development workflow: Docker isolation, frontend CI, backend CI, and GitHub
   Pages deploy are configured.
 

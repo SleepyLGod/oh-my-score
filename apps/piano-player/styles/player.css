@@ -497,6 +497,11 @@ select {
     grid-template-columns: 1fr 1fr;
     gap: 12px;
 }
+.ai-action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
 .ai-sketch-status {
     margin-top: 0;
 }
@@ -1180,6 +1185,7 @@ a {
     .sketch-controls,
     .sketch-actions,
     .ai-sketch-grid,
+    .ai-action-grid,
     .sketch-editor-actions {
         grid-template-columns: 1fr;
     }
