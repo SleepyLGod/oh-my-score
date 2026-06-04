@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="./docs/assets/demo.png" alt="Oh-My-Score studio header">
+</p>
+
+<p align="center">
   <img src="https://readme-typing-svg.herokuapp.com/?font=Roboto+Mono&size=25&width=300&color=46BEA3&duration=1600&lines=Oh-My-Score" height="80" alt="Oh-My-Score"/>
   <br>
   <strong>Audio-to-MIDI transcription, browser playback, and Smart Score tools in one local-first studio.</strong>
@@ -16,9 +20,20 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MPL--2.0-blue" alt="License: MPL 2.0"></a>
 </p>
 
-<p align="center">
-  <img src="./docs/assets/demo.png" alt="Oh-My-Score piano player demo">
-</p>
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="./docs/assets/demo1.png" alt="Oh-My-Score Transcribe workspace" width="100%">
+      <br>
+      <sub>Transcribe audio or MIDI, compare engines, inspect Smart Score results.</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="./docs/assets/demo2.png" alt="Oh-My-Score Sketch workspace" width="100%">
+      <br>
+      <sub>Sketch Strudel code, use AI edits, preview MIDI, and review note activity.</sub>
+    </td>
+  </tr>
+</table>
 
 ## Overview
 
@@ -107,6 +122,9 @@ To enable AI-generated Strudel drafts, copy [`.env.example`](./.env.example) to
 receives these keys; the Docker sidecar routes the selected model through
 OpenAI-compatible Chat Completions locally.
 
+If the page is running but AI Sketch reports that the service is unavailable,
+start the sidecar with `docker compose up -d ai-sketch-service` and retry.
+
 MiMo Token Plan keys start with `tp-` and should use
 `MIMO_BASE_URL=https://token-plan-cn.xiaomimimo.com/v1`. Pay-as-you-go keys
 start with `sk-` and should use the pay-as-you-go base URL from the Xiaomi
@@ -137,9 +155,9 @@ If conversion fails with a missing model error, confirm that
 - Smart Score tools: MIDI analysis, source export, conservative cleanup, preset
   variants, cleanup controls, and configurable Bass + Melody sketches are
   implemented.
-- Sketch mode: fixed-length Strudel pattern export, example patterns, local
-  draft controls, MIDI preview, source load, and download are implemented
-  through a Docker-isolated sidecar.
+- Sketch mode: docked code-to-MIDI IDE, fixed-length Strudel pattern export,
+  example patterns, local draft controls, MIDI preview, source load, download,
+  and generated note activity are implemented through a Docker-isolated sidecar.
 - Optional AI Sketch: `deepseek-v4-pro` and `mimo-v2.5-pro` can generate
   editable Strudel pattern drafts when the matching local API key is configured.
   The same local sidecar can explain, edit, or summarize the current MIDI into
