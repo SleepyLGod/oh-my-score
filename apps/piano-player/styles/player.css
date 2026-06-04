@@ -11,6 +11,15 @@
     --danger: #ff7a7a;
     --shadow: 0 22px 60px rgba(0, 0, 0, 0.38);
     --panel-glow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --sketch-gap: 22px;
+    --sketch-top-safe: 76px;
+    --sketch-dock-height: 176px;
+    --sketch-min-stage-width: 700px;
+    --sketch-min-shell-width: 1102px;
+    --sketch-shell-width: 100vw;
+    --sketch-left-width: calc(100vw - var(--sketch-ide-width) - var(--sketch-gap));
+    --sketch-ide-width: 42vw;
+    --transport-safe-bottom: 154px;
 }
 * {
     box-sizing: border-box;
@@ -63,6 +72,7 @@ select {
     top: 18px;
     left: 22px;
     right: 22px;
+    z-index: 5;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
@@ -198,6 +208,49 @@ select {
     width: min(460px, calc(100vw - 44px));
     overflow-y: auto;
     padding: 18px;
+}
+body.sketch-mode #sketch-panel {
+    right: 0;
+    top: 76px;
+    bottom: var(--sketch-panel-safe-bottom, 56px);
+    width: min(max(380px, var(--sketch-ide-width)), 65vw);
+    overflow: hidden;
+    padding: 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: 8px 0 0 0;
+    background:
+        radial-gradient(circle at 18% 0%, rgba(54, 214, 197, 0.11), transparent 30%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 150px),
+        rgba(11, 14, 17, 0.92);
+}
+#sketch-review-dock {
+    display: contents;
+}
+body.sketch-mode #sketch-review-dock {
+    position: absolute;
+    left: 22px;
+    right: calc(min(max(380px, var(--sketch-ide-width)), 65vw) + 22px);
+    bottom: 22px;
+    z-index: 4;
+    display: grid;
+    grid-template-columns: minmax(320px, 1fr) minmax(180px, 32%);
+    gap: 12px;
+    align-items: stretch;
+    pointer-events: none;
+}
+body.sketch-mode #transport-bar {
+    position: static;
+    width: auto;
+    height: 100%;
+    grid-template-columns: minmax(0, 1fr) minmax(118px, 170px);
+    grid-template-areas:
+        "buttons buttons"
+        "track speed"
+        "timeline timeline"
+        "review review";
+    pointer-events: auto;
+    transform: none;
 }
 .panel-title {
     display: flex;
@@ -490,11 +543,104 @@ select {
     grid-template-columns: 1fr 1fr;
     gap: 12px;
 }
+.sketch-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 3;
+    width: 14px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    cursor: col-resize;
+}
+.sketch-resizer::after {
+    content: "";
+    position: absolute;
+    top: 22px;
+    bottom: 22px;
+    left: 3px;
+    width: 2px;
+    border-radius: 999px;
+    background: rgba(245, 239, 228, 0.12);
+    transition: background 160ms ease, box-shadow 160ms ease;
+}
+.sketch-resizer:hover::after,
+body.is-resizing-sketch .sketch-resizer::after {
+    background: rgba(54, 214, 197, 0.72);
+    box-shadow: 0 0 20px rgba(54, 214, 197, 0.38);
+}
+.sketch-ide-shell {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+}
+.sketch-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.25fr) minmax(0, 1fr) minmax(64px, 0.62fr) minmax(70px, 0.65fr) minmax(104px, 0.9fr);
+    gap: 10px;
+    align-items: end;
+    padding: 14px;
+    border-bottom: 1px solid rgba(245, 239, 228, 0.12);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent),
+        rgba(12, 15, 18, 0.96);
+    backdrop-filter: blur(18px);
+}
+.sketch-toolbar .field {
+    margin-top: 0;
+    gap: 6px;
+}
+.sketch-toolbar select,
+.sketch-toolbar input[type="number"],
+.sketch-toolbar .primary-button {
+    min-height: 36px;
+}
+.sketch-toolbar .primary-button {
+    margin-top: 0;
+}
+.compact-number input,
+.compact-number select {
+    text-align: center;
+}
+.sketch-ide-body {
+    display: grid;
+    grid-template-columns: minmax(270px, 1fr) minmax(220px, 300px);
+    gap: 14px;
+    min-height: 0;
+    padding: 14px;
+    overflow: hidden;
+}
+.sketch-editor-pane,
+.sketch-side-pane {
+    min-height: 0;
+}
+.sketch-editor-pane {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 12px;
+}
+.sketch-editor-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.sketch-editor-bar strong {
+    display: block;
+    margin-top: 3px;
+    font-size: 13px;
+}
 .ai-sketch-card {
     display: grid;
-    gap: 12px;
-    margin-bottom: 14px;
-    padding: 12px;
+    gap: 10px;
+    margin-bottom: 0;
+    padding: 11px;
     border: 1px solid rgba(80, 220, 204, 0.22);
     border-radius: 8px;
     background: linear-gradient(135deg, rgba(80, 220, 204, 0.1), rgba(255, 255, 255, 0.035));
@@ -502,14 +648,19 @@ select {
 }
 .ai-sketch-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
 }
 .ai-sketch-header strong {
     display: block;
-    margin-top: 4px;
-    font-size: 14px;
+    margin-top: 3px;
+    font-size: 13px;
+    line-height: 1.25;
+    white-space: nowrap;
+}
+.ai-sketch-header .badge {
+    flex: 0 0 auto;
 }
 .ai-sketch-grid {
     display: grid;
@@ -519,10 +670,23 @@ select {
 .ai-action-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    gap: 7px;
+}
+.ai-action-grid .secondary-button,
+.draft-actions .secondary-button {
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 11px;
+    line-height: 1.12;
+    white-space: nowrap;
 }
 .ai-sketch-status {
     margin-top: 0;
+    grid-template-columns: auto minmax(0, 1fr);
+}
+.ai-sketch-card .compact-textarea {
+    height: 70px;
+    min-height: 70px;
 }
 .muted-note {
     margin: 0;
@@ -537,12 +701,71 @@ select {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
-    margin: 0 0 12px;
+    margin: 0;
+}
+body.sketch-mode #strudel-code {
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    resize: none;
+    padding: 17px 18px;
+    border-color: rgba(245, 239, 228, 0.15);
+    background:
+        linear-gradient(90deg, rgba(54, 214, 197, 0.06), transparent 34px),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 68px),
+        #05080b;
+    color: #f8f1e6;
+    font-size: 13px;
+    line-height: 1.66;
+    tab-size: 2;
+    caret-color: var(--accent);
+    scrollbar-color: rgba(54, 214, 197, 0.34) rgba(255, 255, 255, 0.05);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.045),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.28),
+        0 18px 48px rgba(0, 0, 0, 0.18);
+}
+body.sketch-mode #strudel-code:focus {
+    outline: none;
+    border-color: rgba(54, 214, 197, 0.5);
+    box-shadow:
+        0 0 0 3px rgba(54, 214, 197, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+body.sketch-mode #strudel-code::selection {
+    background: rgba(54, 214, 197, 0.32);
+    color: #fffaf0;
+}
+body.sketch-mode #strudel-code::placeholder {
+    color: rgba(245, 239, 228, 0.38);
+}
+body.sketch-mode #strudel-code.is-ready {
+    border-color: rgba(245, 239, 228, 0.16);
+}
+body.sketch-mode #strudel-code.is-generating {
+    border-color: rgba(54, 214, 197, 0.55);
+    background:
+        linear-gradient(90deg, rgba(54, 214, 197, 0.085), transparent 34px),
+        linear-gradient(180deg, rgba(54, 214, 197, 0.045), transparent 72px),
+        #05080b;
+}
+body.sketch-mode #strudel-code.is-error {
+    border-color: rgba(255, 122, 122, 0.56);
+    box-shadow:
+        0 0 0 3px rgba(255, 122, 122, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.sketch-side-pane {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    overflow-y: auto;
+    padding-right: 2px;
 }
 .draft-console {
     display: grid;
-    gap: 10px;
-    margin: 0 0 12px;
+    gap: 9px;
+    margin: 0;
     padding: 10px;
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -554,7 +777,7 @@ select {
 .draft-actions {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    gap: 7px;
 }
 .sketch-result {
     display: grid;
@@ -570,6 +793,129 @@ select {
     display: block;
     margin-top: 5px;
     overflow-wrap: anywhere;
+}
+.note-activity {
+    display: none;
+    gap: 6px;
+    padding: 8px;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid rgba(245, 239, 228, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+}
+body.sketch-mode .note-activity {
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto;
+}
+.note-activity-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+#note-activity-summary {
+    color: var(--muted);
+    font-size: 11px;
+    min-width: 0;
+    overflow: hidden;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.note-activity-grid {
+    position: relative;
+    min-width: 0;
+    height: 62px;
+    min-height: 62px;
+    overflow: hidden;
+    border: 1px solid rgba(245, 239, 228, 0.1);
+    border-radius: 8px;
+    background:
+        linear-gradient(90deg, rgba(245, 239, 228, 0.12) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(245, 239, 228, 0.075) 1px, transparent 1px),
+        rgba(5, 8, 11, 0.56);
+    background-size: calc(100% / 8) 100%, 100% 18.75%;
+}
+.note-activity-grid.is-empty {
+    display: grid;
+    place-items: center;
+}
+.note-activity-empty {
+    color: var(--muted);
+    font-size: 12px;
+}
+.note-activity-grid:not(.is-empty) .note-activity-empty {
+    display: none;
+}
+.note-density {
+    display: grid;
+    gap: 5px;
+    min-height: 0;
+}
+.note-density-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+#note-density-summary {
+    color: var(--muted);
+    font-size: 10px;
+    min-width: 0;
+    overflow: hidden;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.note-density-grid {
+    display: grid;
+    align-items: end;
+    gap: 3px;
+    height: 34px;
+    min-height: 34px;
+    padding: 5px;
+    overflow: hidden;
+    border: 1px solid rgba(245, 239, 228, 0.1);
+    border-radius: 8px;
+    background:
+        linear-gradient(180deg, rgba(245, 239, 228, 0.07) 1px, transparent 1px),
+        rgba(5, 8, 11, 0.62);
+    background-size: 100% 50%;
+}
+.note-density-grid.is-empty {
+    display: grid;
+    place-items: center;
+}
+.note-density-grid:not(.is-empty) .note-density-empty {
+    display: none;
+}
+.note-density-empty {
+    color: var(--muted);
+    font-size: 10px;
+}
+.note-density-bar {
+    display: block;
+    min-height: 3px;
+    border-radius: 999px 999px 2px 2px;
+    background: linear-gradient(180deg, rgba(54, 214, 197, 0.95), rgba(240, 179, 90, 0.72));
+    box-shadow: 0 0 12px rgba(54, 214, 197, 0.18);
+}
+.note-block {
+    position: absolute;
+    min-width: 2px;
+    height: 5px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(54, 214, 197, 0.82), rgba(240, 179, 90, 0.76));
+    box-shadow: 0 0 12px rgba(54, 214, 197, 0.22);
+}
+.note-activity-bar-label {
+    position: absolute;
+    top: 6px;
+    color: rgba(245, 239, 228, 0.46);
+    font-size: 10px;
+    transform: translateX(-50%);
 }
 .sketch-actions {
     display: grid;
@@ -865,18 +1211,26 @@ kbd small {
     transform: translateX(-50%);
 }
 #copyright {
-    position: absolute;
+    position: fixed;
     right: 22px;
     bottom: 22px;
+    z-index: 6;
     pointer-events: auto;
     color: var(--muted);
     font-size: 12px;
     text-align: right;
 }
+@media (min-width: 961px) {
+    body.sketch-mode .stage-canvas,
+    body.sketch-mode #scene-vignette {
+        right: auto;
+        width: calc(100vw - min(max(380px, var(--sketch-ide-width)), 65vw));
+    }
+}
 .stage-tips {
     position: fixed;
     left: 22px;
-    bottom: 22px;
+    bottom: var(--transport-safe-bottom);
     z-index: 6;
     pointer-events: auto;
 }
@@ -905,7 +1259,7 @@ kbd small {
 .stage-tips-popover {
     position: absolute;
     left: 0;
-    bottom: 118px;
+    bottom: 52px;
     width: min(284px, calc(100vw - 44px));
     padding: 14px;
     border: 1px solid rgba(255, 255, 255, 0.17);
@@ -959,6 +1313,21 @@ kbd small {
     color: var(--text);
     font-size: 12px;
     font-weight: 800;
+    white-space: nowrap;
+}
+body.sketch-mode .transport-buttons {
+    flex-wrap: nowrap;
+    gap: 6px;
+}
+body.sketch-mode .icon-button {
+    min-width: 56px;
+    padding: 0 8px;
+}
+body.sketch-mode #reset-view-button {
+    min-width: 76px;
+}
+body.sketch-mode .interaction-hint {
+    display: none;
 }
 .toggle-button[aria-pressed="true"],
 .toggle-button.is-active {
@@ -1119,6 +1488,19 @@ a {
         width: min(440px, calc(100vw - 24px));
         padding: 14px;
     }
+    .sketch-resizer {
+        display: none;
+    }
+    .sketch-toolbar {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .sketch-ide-body {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+    }
+    .sketch-editor-pane {
+        min-height: 420px;
+    }
     #upload-panel {
         left: 12px;
     }
@@ -1137,11 +1519,11 @@ a {
     }
     #copyright {
         right: 12px;
-        bottom: 248px;
+        bottom: var(--transport-safe-bottom);
     }
     .stage-tips {
         left: 12px;
-        bottom: 264px;
+        bottom: var(--transport-safe-bottom);
     }
     .stage-tips-popover {
         bottom: 52px;
@@ -1186,6 +1568,23 @@ a {
         top: 102px;
         bottom: 270px;
     }
+    .sketch-toolbar {
+        grid-template-columns: 1fr 1fr;
+        padding: 12px;
+    }
+    .sketch-toolbar .primary-button {
+        grid-column: 1 / -1;
+    }
+    .sketch-ide-body {
+        padding: 12px;
+    }
+    .sketch-editor-bar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+    .sketch-editor-pane {
+        min-height: 360px;
+    }
     #transport-bar {
         grid-template-columns: 1fr;
         grid-template-areas:
@@ -1198,12 +1597,12 @@ a {
     #copyright {
         left: 12px;
         right: 12px;
-        bottom: 118px;
+        bottom: var(--transport-safe-bottom);
         text-align: center;
     }
     .stage-tips {
         left: 12px;
-        bottom: 252px;
+        bottom: var(--transport-safe-bottom);
     }
     .stage-tips-popover {
         width: min(284px, calc(100vw - 24px));
@@ -1234,5 +1633,379 @@ a {
     }
     textarea {
         min-height: 220px;
+    }
+}
+
+body.sketch-mode {
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-width: var(--sketch-min-shell-width);
+}
+body.sketch-mode #app-shell {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: var(--sketch-shell-width);
+    min-width: var(--sketch-min-shell-width);
+    height: 100vh;
+    min-height: 100vh;
+    overflow: visible;
+}
+body.sketch-mode .topbar {
+    top: 18px;
+    left: var(--sketch-gap);
+    right: var(--sketch-gap);
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas: none;
+    align-items: center;
+}
+body.sketch-mode .brand {
+    grid-area: auto;
+}
+body.sketch-mode .mode-switch {
+    grid-area: auto;
+    width: auto;
+    justify-self: center;
+    grid-template-columns: repeat(2, minmax(106px, 1fr));
+}
+body.sketch-mode .status-pill {
+    grid-area: auto;
+    max-width: none;
+    white-space: nowrap;
+    justify-self: end;
+}
+body.sketch-mode .stage-canvas,
+body.sketch-mode #scene-vignette {
+    right: auto;
+    width: var(--sketch-left-width);
+}
+body.sketch-mode #sketch-panel {
+    position: absolute;
+    left: auto;
+    right: 0;
+    top: var(--sketch-top-safe);
+    bottom: 34px;
+    width: var(--sketch-ide-width);
+    min-width: 380px;
+    transform: none;
+    overflow: hidden;
+    padding: 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: 8px 0 0 0;
+}
+body.sketch-mode .sketch-resizer {
+    display: block;
+}
+body.sketch-mode #sketch-review-dock {
+    position: absolute;
+    left: var(--sketch-gap);
+    right: auto;
+    bottom: var(--sketch-gap);
+    width: calc(var(--sketch-left-width) - (var(--sketch-gap) * 2));
+    height: var(--sketch-dock-height);
+    z-index: 4;
+    display: grid;
+    grid-template-columns: minmax(420px, 1fr) minmax(220px, 260px);
+    gap: 12px;
+    align-items: stretch;
+    pointer-events: none;
+}
+body.sketch-mode #transport-bar {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: auto;
+    height: 100%;
+    transform: none;
+    grid-template-columns: minmax(250px, auto) minmax(0, 1fr) minmax(118px, 150px);
+    grid-template-areas:
+        "buttons track speed"
+        "timeline timeline timeline"
+        "review review review";
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    overflow: hidden;
+    pointer-events: auto;
+}
+body.sketch-mode #note-activity {
+    position: static;
+    width: auto;
+    height: 100%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto;
+}
+body.sketch-mode .transport-buttons {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+}
+body.sketch-mode .icon-button {
+    flex: 0 0 auto;
+}
+body.sketch-mode .review-control {
+    grid-template-columns: minmax(115px, auto) minmax(0, 1fr) minmax(120px, auto);
+}
+body.sketch-mode #loop-range-status {
+    text-align: right;
+}
+
+/* Studio Shell V2: keep workflow structure stable before responsive decoration. */
+:root {
+    --studio-gap: 22px;
+    --studio-top-safe: 92px;
+    --studio-footer-safe: 22px;
+    --studio-side-width: 360px;
+    --studio-inspector-width: 378px;
+    --studio-transport-width: 940px;
+    --studio-transport-height: 178px;
+    --studio-sketch-dock-height: 204px;
+    --studio-min-transcribe-width: 1180px;
+    --studio-min-sketch-stage: 700px;
+    --studio-focus-ring: 0 0 0 3px rgba(54, 214, 197, 0.18);
+    --studio-panel-bg:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 110px),
+        rgba(12, 15, 18, 0.88);
+    --studio-panel-border: rgba(245, 239, 228, 0.14);
+}
+body {
+    background:
+        radial-gradient(circle at 52% 46%, rgba(54, 214, 197, 0.045), transparent 34%),
+        linear-gradient(180deg, #08090b 0%, #090b0d 44%, #050607 100%);
+}
+body:not(.sketch-mode) {
+    min-width: var(--studio-min-transcribe-width);
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+body:not(.sketch-mode) #app-shell {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: max(100vw, var(--studio-min-transcribe-width));
+    min-width: var(--studio-min-transcribe-width);
+    height: 100vh;
+    min-height: 720px;
+    overflow: visible;
+}
+.topbar {
+    min-height: 46px;
+}
+.panel,
+#transport-bar,
+.note-activity {
+    border-color: var(--studio-panel-border);
+    background: var(--studio-panel-bg);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.36), var(--panel-glow);
+}
+.panel {
+    border-radius: 10px;
+}
+button,
+.file-pick,
+select,
+input,
+textarea,
+.mode-switch span,
+.segmented-control span {
+    transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+button:focus-visible,
+.file-pick:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+.mode-switch label:focus-within span,
+.segmented-control label:focus-within span {
+    outline: 0;
+    box-shadow: var(--studio-focus-ring);
+}
+body:not(.sketch-mode) .topbar {
+    top: 18px;
+    left: var(--studio-gap);
+    right: var(--studio-gap);
+    grid-template-columns: minmax(280px, 1fr) auto minmax(160px, 1fr);
+    grid-template-areas: none;
+    align-items: center;
+}
+body:not(.sketch-mode) .brand,
+body:not(.sketch-mode) .mode-switch,
+body:not(.sketch-mode) .status-pill {
+    grid-area: auto;
+}
+body:not(.sketch-mode) .mode-switch {
+    width: auto;
+    justify-self: center;
+}
+body:not(.sketch-mode) .status-pill {
+    max-width: none;
+    justify-self: end;
+    white-space: nowrap;
+}
+body:not(.sketch-mode) #upload-panel,
+body:not(.sketch-mode) #settings-panel {
+    top: var(--studio-top-safe);
+    bottom: calc(var(--studio-footer-safe) + var(--studio-transport-height) + 18px);
+    max-height: none;
+    padding: 16px;
+    overflow-y: auto;
+}
+body:not(.sketch-mode) #upload-panel {
+    left: var(--studio-gap);
+    width: var(--studio-side-width);
+}
+body:not(.sketch-mode) #settings-panel {
+    right: var(--studio-gap);
+    width: var(--studio-inspector-width);
+}
+body:not(.sketch-mode) #transport-bar {
+    left: 50%;
+    bottom: var(--studio-footer-safe);
+    width: min(var(--studio-transport-width), calc(100vw - 44px));
+    min-height: var(--studio-transport-height);
+    transform: translateX(-50%);
+    grid-template-columns: minmax(300px, auto) minmax(0, 1fr) minmax(170px, 240px);
+    grid-template-areas:
+        "buttons track speed"
+        "timeline timeline timeline"
+        "review review review";
+    gap: 14px;
+    padding: 14px;
+    border-radius: 10px;
+}
+body:not(.sketch-mode) #note-activity {
+    display: none;
+}
+body:not(.sketch-mode) .transport-buttons,
+body:not(.sketch-mode) .loop-range-actions {
+    flex-wrap: nowrap;
+}
+body:not(.sketch-mode) .icon-button {
+    flex: 0 0 auto;
+}
+body:not(.sketch-mode) .review-control {
+    grid-template-columns: minmax(150px, auto) minmax(0, 1fr) minmax(130px, auto);
+}
+body:not(.sketch-mode) #loop-range-status {
+    text-align: right;
+}
+body.sketch-mode {
+    --sketch-gap: var(--studio-gap);
+    --sketch-top-safe: 76px;
+    --sketch-dock-height: var(--studio-sketch-dock-height);
+    --sketch-min-stage-width: var(--studio-min-sketch-stage);
+}
+body.sketch-mode .topbar {
+    min-width: calc(var(--sketch-min-shell-width) - (var(--studio-gap) * 2));
+}
+body.sketch-mode #sketch-panel {
+    border-left: 1px solid var(--studio-panel-border);
+    background:
+        radial-gradient(circle at 16% 0%, rgba(54, 214, 197, 0.1), transparent 28%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.052), transparent 160px),
+        rgba(8, 11, 13, 0.94);
+}
+body.sketch-mode #sketch-review-dock {
+    height: var(--studio-sketch-dock-height);
+}
+body.sketch-mode #transport-bar {
+    border-radius: 10px;
+    grid-template-columns: minmax(290px, auto) minmax(0, 1fr) minmax(120px, 150px);
+}
+body.sketch-mode .note-activity {
+    border-radius: 10px;
+}
+.panel-title,
+.disclosure-summary,
+.sketch-toolbar,
+.sketch-editor-bar,
+.compare-toolbar,
+.note-activity-header {
+    letter-spacing: 0;
+}
+.primary-button,
+.secondary-button,
+.icon-button,
+.file-pick {
+    border-radius: 8px;
+    white-space: nowrap;
+}
+.primary-button {
+    background: linear-gradient(180deg, rgba(54, 214, 197, 1), rgba(31, 185, 171, 0.94));
+    box-shadow: 0 14px 32px rgba(54, 214, 197, 0.16);
+}
+.secondary-button,
+.icon-button,
+.file-pick {
+    background: rgba(255, 255, 255, 0.07);
+}
+.secondary-button:hover,
+.icon-button:hover,
+.file-pick:hover {
+    border-color: rgba(54, 214, 197, 0.36);
+    background: rgba(54, 214, 197, 0.11);
+}
+.sketch-toolbar {
+    align-items: end;
+    grid-template-columns: minmax(140px, 1fr) minmax(160px, 1.08fr) minmax(140px, 1fr) 84px 92px minmax(136px, auto);
+}
+#strudel-code {
+    font-family: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.62;
+    letter-spacing: 0;
+}
+.ai-sketch-card,
+.draft-console,
+.sketch-result,
+.compare-card,
+.conversion-result,
+.source-audio-preview {
+    border-radius: 10px;
+}
+@media (max-width: 960px) {
+    body:not(.sketch-mode) {
+        min-width: var(--studio-min-transcribe-width);
+    }
+    body:not(.sketch-mode) #app-shell {
+        position: absolute;
+        width: var(--studio-min-transcribe-width);
+        min-width: var(--studio-min-transcribe-width);
+    }
+    body:not(.sketch-mode) .topbar {
+        top: 18px;
+        left: var(--studio-gap);
+        right: var(--studio-gap);
+        grid-template-columns: minmax(280px, 1fr) auto minmax(160px, 1fr);
+    }
+    body:not(.sketch-mode) #upload-panel {
+        left: var(--studio-gap);
+        width: var(--studio-side-width);
+    }
+    body:not(.sketch-mode) #settings-panel {
+        left: auto;
+        right: var(--studio-gap);
+        width: var(--studio-inspector-width);
+    }
+    body:not(.sketch-mode) #transport-bar {
+        left: 50%;
+        right: auto;
+        width: var(--studio-transport-width);
+        transform: translateX(-50%);
+        grid-template-columns: minmax(300px, auto) minmax(0, 1fr) minmax(170px, 240px);
+        grid-template-areas:
+            "buttons track speed"
+            "timeline timeline timeline"
+            "review review review";
+    }
+    body:not(.sketch-mode) #copyright {
+        left: auto;
+        right: var(--studio-gap);
+        bottom: var(--transport-safe-bottom);
+        text-align: right;
+    }
+    body:not(.sketch-mode) .stage-tips {
+        left: var(--studio-gap);
     }
 }

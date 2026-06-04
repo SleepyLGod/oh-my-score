@@ -346,6 +346,12 @@ code or apply a user-requested edit through the same local AI sidecar. Edits
 replace the editor content only after source validation; MIDI generation remains
 an explicit user action.
 
+Sketch Docked IDE status: V1 done. Sketch mode now uses a docked, resizable
+right-side code-to-MIDI workspace with a compact toolbar, larger editor, AI and
+draft tools, generated MIDI output, and a lightweight Note Activity view. This
+does not change the Transcribe workflow and does not turn Sketch into a full
+live Strudel REPL.
+
 Cleanup controls status: V1 done. Smart Score cleanup now exposes short-note,
 duplicate-overlap, and velocity normalization controls while preserving the
 previous default behavior and keeping cleaned MIDI as a separate variant.

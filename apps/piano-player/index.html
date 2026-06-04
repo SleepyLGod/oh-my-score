@@ -22,7 +22,7 @@
         <script src="./vendor/OrbitAndPanControls.js"></script>
         <script src="./vendor/ColladaLoader.js"></script>
 
-        <link rel="stylesheet" href="./styles/player.css?v=studio-tips">
+        <link rel="stylesheet" href="./styles/player.css?v=studio-shell-v2">
     </head>
     <body>
         <div id="scene-vignette"></div>
@@ -149,17 +149,19 @@
                 </div>
             </section>
 
-            <section id="sketch-panel" class="panel" hidden>
-                <h2 class="panel-title">Code to MIDI <span class="badge">Sketch</span></h2>
-                <div class="ai-sketch-card">
-                    <div class="ai-sketch-header">
-                        <div>
-                            <span class="field-label">AI Sketch</span>
-                            <strong>Prompt to pattern</strong>
+            <section id="sketch-panel" class="panel sketch-ide" hidden>
+                <button id="sketch-resizer" class="sketch-resizer" type="button" aria-label="Resize Sketch workspace"></button>
+                <div class="sketch-ide-shell">
+                    <header class="sketch-toolbar">
+                        <div class="field">
+                            <label class="field-label" for="strudel-example">Example</label>
+                            <select id="strudel-example">
+                                <option value="arpeggio" selected>Arpeggio</option>
+                                <option value="bassline">Bassline</option>
+                                <option value="chords">Chord sketch</option>
+                                <option value="minimal">Minimal melody</option>
+                            </select>
                         </div>
-                        <span class="badge">Optional</span>
-                    </div>
-                    <div class="ai-sketch-grid">
                         <div class="field">
                             <label class="field-label" for="ai-model">Model</label>
                             <select id="ai-model">
@@ -178,86 +180,93 @@
                                 <option value="cinematic">Cinematic</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="field">
-                        <label class="field-label" for="ai-prompt">Prompt</label>
-                        <textarea id="ai-prompt" class="compact-textarea" spellcheck="true" placeholder="Gentle arpeggio in D minor with a warm bass movement"></textarea>
-                    </div>
-                    <div class="ai-action-grid">
-                        <button id="generate-ai-sketch-button" class="secondary-button" type="button">Generate Pattern</button>
-                        <button id="midi-to-strudel-button" class="secondary-button" type="button">From Current MIDI</button>
-                        <button id="explain-ai-sketch-button" class="secondary-button" type="button">Explain Code</button>
-                    </div>
-                    <div class="field">
-                        <label class="field-label" for="ai-edit-prompt">Edit prompt</label>
-                        <textarea id="ai-edit-prompt" class="compact-textarea" spellcheck="true" placeholder="Make it darker, slower, and simpler"></textarea>
-                    </div>
-                    <button id="apply-ai-edit-button" class="secondary-button" type="button">Apply Edit</button>
-                    <div class="convert-status ai-sketch-status">
-                        <span class="field-label">AI</span>
-                        <span id="ai-sketch-status">Optional local AI service</span>
-                    </div>
-                    <p id="ai-sketch-meta" class="muted-note" hidden></p>
-                </div>
-                <div class="field">
-                    <label class="field-label" for="strudel-example">Example</label>
-                    <select id="strudel-example">
-                        <option value="arpeggio" selected>Arpeggio</option>
-                        <option value="bassline">Bassline</option>
-                        <option value="chords">Chord sketch</option>
-                        <option value="minimal">Minimal melody</option>
-                    </select>
-                </div>
-                <div class="sketch-editor-actions">
-                    <button id="reset-strudel-example-button" class="secondary-button" type="button">Reset example</button>
-                    <button id="tidy-strudel-button" class="secondary-button" type="button">Tidy</button>
-                    <button id="clear-strudel-button" class="secondary-button" type="button">Clear</button>
-                </div>
-                <div class="draft-console">
-                    <div class="field">
-                        <label class="field-label" for="strudel-draft-select">Local draft</label>
-                        <select id="strudel-draft-select">
-                            <option value="">No saved drafts</option>
-                        </select>
-                    </div>
-                    <div class="draft-actions">
-                        <button id="save-strudel-draft-button" class="secondary-button" type="button">Save Draft</button>
-                        <button id="load-strudel-draft-button" class="secondary-button" type="button">Load Draft</button>
-                        <button id="duplicate-strudel-draft-button" class="secondary-button" type="button">Duplicate Draft</button>
-                    </div>
-                </div>
-                <div class="field">
-                    <label class="field-label" for="strudel-code">Pattern</label>
-                    <textarea id="strudel-code" spellcheck="false"></textarea>
-                </div>
-                <div class="sketch-controls">
-                    <div class="field">
-                        <label class="field-label" for="strudel-bars">Bars</label>
-                        <select id="strudel-bars">
-                            <option value="4">4</option>
-                            <option value="8" selected>8</option>
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label class="field-label" for="strudel-bpm">BPM</label>
-                        <input id="strudel-bpm" type="number" min="40" max="240" step="1" value="120">
-                    </div>
-                </div>
-                <button id="generate-strudel-button" class="primary-button" type="button">Generate MIDI</button>
-                <div class="convert-status">
-                    <span class="field-label">Status</span>
-                    <span id="strudel-status">Ready to sketch</span>
-                </div>
-                <div id="strudel-result" class="sketch-result" hidden>
-                    <div>
-                        <span class="field-label">Generated MIDI</span>
-                        <strong id="strudel-result-title">Strudel sketch</strong>
-                    </div>
-                    <span id="strudel-metrics" class="compare-metrics">Waiting for MIDI metrics</span>
-                    <div class="sketch-actions">
-                        <button id="preview-strudel-button" class="secondary-button" type="button">Preview</button>
-                        <button id="load-strudel-button" class="secondary-button" type="button">Load as Source</button>
-                        <a id="download-strudel-link" class="secondary-button" href="#" download>Download</a>
+                        <div class="field compact-number">
+                            <label class="field-label" for="strudel-bars">Bars</label>
+                            <select id="strudel-bars">
+                                <option value="4">4</option>
+                                <option value="8" selected>8</option>
+                            </select>
+                        </div>
+                        <div class="field compact-number">
+                            <label class="field-label" for="strudel-bpm">BPM</label>
+                            <input id="strudel-bpm" type="number" min="40" max="240" step="1" value="120">
+                        </div>
+                        <button id="generate-strudel-button" class="primary-button" type="button">Generate MIDI</button>
+                    </header>
+                    <div class="sketch-ide-body">
+                        <div class="sketch-editor-pane">
+                            <div class="sketch-editor-bar">
+                                <div>
+                                    <span class="field-label">Strudel Source</span>
+                                    <strong>Pattern editor</strong>
+                                </div>
+                                <div class="sketch-editor-actions">
+                                    <button id="reset-strudel-example-button" class="secondary-button" type="button">Reset example</button>
+                                    <button id="tidy-strudel-button" class="secondary-button" type="button">Tidy</button>
+                                    <button id="clear-strudel-button" class="secondary-button" type="button">Clear</button>
+                                </div>
+                            </div>
+                            <textarea id="strudel-code" spellcheck="false" aria-label="Pattern"></textarea>
+                        </div>
+                        <aside class="sketch-side-pane">
+                            <div class="ai-sketch-card">
+                                <div class="ai-sketch-header">
+                                    <div>
+                                        <span class="field-label">AI Sketch</span>
+                                        <strong>Prompt, edit, summarize</strong>
+                                    </div>
+                                    <span class="badge">Optional</span>
+                                </div>
+                                <div class="field">
+                                    <label class="field-label" for="ai-prompt">Prompt</label>
+                                    <textarea id="ai-prompt" class="compact-textarea" spellcheck="true" placeholder="Gentle arpeggio in D minor with a warm bass movement"></textarea>
+                                </div>
+                                <div class="ai-action-grid">
+                                    <button id="generate-ai-sketch-button" class="secondary-button" type="button" title="Generate Pattern">Generate</button>
+                                    <button id="midi-to-strudel-button" class="secondary-button" type="button" title="From Current MIDI">From MIDI</button>
+                                    <button id="explain-ai-sketch-button" class="secondary-button" type="button" title="Explain Code">Explain</button>
+                                </div>
+                                <div class="field">
+                                    <label class="field-label" for="ai-edit-prompt">Edit prompt</label>
+                                    <textarea id="ai-edit-prompt" class="compact-textarea" spellcheck="true" placeholder="Make it darker, slower, and simpler"></textarea>
+                                </div>
+                                <button id="apply-ai-edit-button" class="secondary-button" type="button">Apply Edit</button>
+                                <div class="convert-status ai-sketch-status">
+                                    <span class="field-label">AI</span>
+                                    <span id="ai-sketch-status">Optional local AI service</span>
+                                </div>
+                                <p id="ai-sketch-meta" class="muted-note" hidden></p>
+                            </div>
+                            <div class="draft-console">
+                                <div class="field">
+                                    <label class="field-label" for="strudel-draft-select">Local draft</label>
+                                    <select id="strudel-draft-select">
+                                        <option value="">No saved drafts</option>
+                                    </select>
+                                </div>
+                                <div class="draft-actions">
+                                    <button id="save-strudel-draft-button" class="secondary-button" type="button">Save Draft</button>
+                                    <button id="load-strudel-draft-button" class="secondary-button" type="button">Load Draft</button>
+                                    <button id="duplicate-strudel-draft-button" class="secondary-button" type="button">Duplicate Draft</button>
+                                </div>
+                            </div>
+                            <div class="convert-status">
+                                <span class="field-label">Status</span>
+                                <span id="strudel-status">Ready to sketch</span>
+                            </div>
+                            <div id="strudel-result" class="sketch-result" hidden>
+                                <div>
+                                    <span class="field-label">Generated MIDI</span>
+                                    <strong id="strudel-result-title">Strudel sketch</strong>
+                                </div>
+                                <span id="strudel-metrics" class="compare-metrics">Waiting for MIDI metrics</span>
+                                <div class="sketch-actions">
+                                    <button id="preview-strudel-button" class="secondary-button" type="button">Preview</button>
+                                    <button id="load-strudel-button" class="secondary-button" type="button">Load as Source</button>
+                                    <a id="download-strudel-link" class="secondary-button" href="#" download>Download</a>
+                                </div>
+                            </div>
+                        </aside>
                     </div>
                 </div>
             </section>
@@ -407,47 +416,67 @@
                 </details>
             </aside>
 
-            <footer id="transport-bar">
-                <div class="transport-buttons">
-                    <button id="play-button" class="icon-button" type="button" aria-label="Play">Play</button>
-                    <button id="restart-button" class="icon-button" type="button" aria-label="Restart">Restart</button>
-                    <button id="stop-button" class="icon-button" type="button" aria-label="Stop">Stop</button>
-                    <button id="loop-button" class="icon-button toggle-button" type="button" aria-label="Loop" aria-pressed="false">Loop</button>
-                    <button id="reset-view-button" class="icon-button" type="button" aria-label="Reset view">Reset view</button>
-                </div>
-                <div class="track-info">
-                    <span class="track-title">Now playing</span>
-                    <span id="active-song-title">Game Of Thrones Theme, Ramin Djawadi</span>
-                    <span class="interaction-hint">Mouse/touch keys · Drag/wheel camera · Keyboard performance</span>
-                </div>
-                <div class="timeline-control" aria-label="Playback timeline">
-                    <span id="current-time" class="time-readout">0:00</span>
-                    <div class="timeline-track">
-                        <input id="timeline-slider" type="range" min="0" max="1000" step="1" value="0" disabled>
-                        <div id="timeline-grid" class="timeline-grid" aria-hidden="true"></div>
+            <div id="sketch-review-dock">
+                <footer id="transport-bar">
+                    <div class="transport-buttons">
+                        <button id="play-button" class="icon-button" type="button" aria-label="Play">Play</button>
+                        <button id="restart-button" class="icon-button" type="button" aria-label="Restart">Restart</button>
+                        <button id="stop-button" class="icon-button" type="button" aria-label="Stop">Stop</button>
+                        <button id="loop-button" class="icon-button toggle-button" type="button" aria-label="Loop" aria-pressed="false">Loop</button>
+                        <button id="reset-view-button" class="icon-button" type="button" aria-label="Reset view">Reset view</button>
                     </div>
-                    <span id="duration-time" class="time-readout">--</span>
-                </div>
-                <div class="review-control" aria-label="Bar beat and loop range controls">
-                    <div class="review-readouts">
-                        <span id="bar-beat-readout">Bar -- Beat --</span>
-                        <span id="total-bars-readout">-- bars</span>
+                    <div class="track-info">
+                        <span class="track-title">Now playing</span>
+                        <span id="active-song-title">Game Of Thrones Theme, Ramin Djawadi</span>
+                        <span class="interaction-hint">Mouse/touch keys · Drag/wheel camera · Keyboard performance</span>
                     </div>
-                    <div class="loop-range-actions">
-                        <button id="loop-start-button" class="secondary-button" type="button" disabled>Set loop start</button>
-                        <button id="loop-end-button" class="secondary-button" type="button" disabled>Set loop end</button>
-                        <button id="loop-clear-button" class="secondary-button" type="button" disabled>Clear loop range</button>
+                    <div class="timeline-control" aria-label="Playback timeline">
+                        <span id="current-time" class="time-readout">0:00</span>
+                        <div class="timeline-track">
+                            <input id="timeline-slider" type="range" min="0" max="1000" step="1" value="0" disabled>
+                            <div id="timeline-grid" class="timeline-grid" aria-hidden="true"></div>
+                        </div>
+                        <span id="duration-time" class="time-readout">--</span>
                     </div>
-                    <span id="loop-range-status">Loop range: full track</span>
-                </div>
-                <div class="speed-control">
-                    <div class="speed-label">
-                        <label class="field-label" for="speed-slider">Speed</label>
-                        <span id="speed-value" class="value-readout">1.0x</span>
+                    <div class="review-control" aria-label="Bar beat and loop range controls">
+                        <div class="review-readouts">
+                            <span id="bar-beat-readout">Bar -- Beat --</span>
+                            <span id="total-bars-readout">-- bars</span>
+                        </div>
+                        <div class="loop-range-actions">
+                            <button id="loop-start-button" class="secondary-button" type="button" disabled>Set loop start</button>
+                            <button id="loop-end-button" class="secondary-button" type="button" disabled>Set loop end</button>
+                            <button id="loop-clear-button" class="secondary-button" type="button" disabled>Clear loop range</button>
+                        </div>
+                        <span id="loop-range-status">Loop range: full track</span>
                     </div>
-                    <input id="speed-slider" type="range" min="0.5" max="2" step="0.1" value="1">
+                    <div class="speed-control">
+                        <div class="speed-label">
+                            <label class="field-label" for="speed-slider">Speed</label>
+                            <span id="speed-value" class="value-readout">1.0x</span>
+                        </div>
+                        <input id="speed-slider" type="range" min="0.5" max="2" step="0.1" value="1">
+                    </div>
+                </footer>
+                <div id="note-activity" class="note-activity" aria-label="Note activity visualization">
+                    <div class="note-activity-header">
+                        <span class="field-label">Note Activity</span>
+                        <span id="note-activity-summary">Generate MIDI to view note activity</span>
+                    </div>
+                    <div id="note-activity-grid" class="note-activity-grid">
+                        <span class="note-activity-empty">Generate MIDI to view note activity</span>
+                    </div>
+                    <div class="note-density" aria-label="MIDI note density by bar">
+                        <div class="note-density-header">
+                            <span class="field-label">Density</span>
+                            <span id="note-density-summary">Waiting for MIDI</span>
+                        </div>
+                        <div id="note-density-grid" class="note-density-grid is-empty">
+                            <span class="note-density-empty">Generate MIDI</span>
+                        </div>
+                    </div>
                 </div>
-            </footer>
+            </div>
             <div class="stage-tips">
                 <button id="stage-tips-button" class="stage-tips-button" type="button" aria-label="Show stage controls" aria-controls="stage-tips-popover" aria-expanded="false">?</button>
                 <div id="stage-tips-popover" class="stage-tips-popover" hidden>
@@ -463,6 +492,6 @@
             </div>
             <div id="copyright">Copyright © Von Lu</div>
         </div>
-        <script src="./scripts/player.js" type="text/javascript"></script>
+        <script src="./scripts/player.js?v=studio-shell-v2" type="text/javascript"></script>
     </body>
 </html>
