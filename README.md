@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/assets/demo.png" alt="Oh-My-Score studio header">
+  <img src="./docs/assets/header.png" alt="Oh-My-Score studio header">
 </p>
 
 <p align="center">
