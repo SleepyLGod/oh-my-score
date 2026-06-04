@@ -48,6 +48,7 @@ var compareResultsPanel = document.getElementById("compare-results");
 var clearCompareResultsButton = document.getElementById("clear-compare-results-button");
 var compareCards = Array.prototype.slice.call(document.querySelectorAll(".compare-card"));
 var sketchPanel = document.getElementById("sketch-panel");
+var sketchResizer = document.getElementById("sketch-resizer");
 var strudelExampleSelect = document.getElementById("strudel-example");
 var strudelCodeInput = document.getElementById("strudel-code");
 var strudelBarsSelect = document.getElementById("strudel-bars");
@@ -74,6 +75,10 @@ var strudelStatus = document.getElementById("strudel-status");
 var strudelResult = document.getElementById("strudel-result");
 var strudelResultTitle = document.getElementById("strudel-result-title");
 var strudelMetrics = document.getElementById("strudel-metrics");
+var noteActivitySummary = document.getElementById("note-activity-summary");
+var noteActivityGrid = document.getElementById("note-activity-grid");
+var noteDensitySummary = document.getElementById("note-density-summary");
+var noteDensityGrid = document.getElementById("note-density-grid");
 var previewStrudelButton = document.getElementById("preview-strudel-button");
 var loadStrudelButton = document.getElementById("load-strudel-button");
 var downloadStrudelLink = document.getElementById("download-strudel-link");
@@ -144,6 +149,9 @@ var loopRangeEndSeconds = null;
 var activePlaybackProgram = 0;
 var activePlaybackPrograms = null;
 var strudelDraftStorageKey = "oh-my-score:strudel-drafts:v1";
+var sketchIdeWidthStorageKey = "oh-my-score:sketch-ide-width:v1";
+var sketchMinimumStageWidth = 700;
+var sketchGap = 22;
 var activePlaybackIsPreview = false;
 var previewRestoreState = null;
 var presetPlaybackOptions = null;
@@ -410,6 +418,106 @@ function setWorkspaceMode(mode) {
     settingsPanel.hidden = isSketchMode;
     sketchPanel.hidden = !isSketchMode;
     document.body.classList.toggle("sketch-mode", isSketchMode);
+    if (isSketchMode) {
+        restoreSketchIdeWidth();
+    }
+    on_window_resize();
+    updateFloatingChromeOffsets();
+}
+
+function defaultSketchIdeWidth() {
+    return Math.round(window.innerWidth * 0.42);
+}
+
+function clampSketchIdeWidth(width) {
+    var minimum = 380;
+    var maximum = Math.max(minimum, Math.min(
+        Math.round(window.innerWidth * 0.65),
+        Math.round(window.innerWidth - sketchMinimumStageWidth - sketchGap)
+    ));
+    return Math.max(minimum, Math.min(maximum, Math.round(width)));
+}
+
+function applySketchIdeWidth(width, persist) {
+    if (!document.documentElement) return;
+    var nextWidth = clampSketchIdeWidth(width);
+    document.documentElement.style.setProperty("--sketch-ide-width", nextWidth + "px");
+    updateSketchLayoutMetrics();
+    if (persist) {
+        try {
+            localStorage.setItem(sketchIdeWidthStorageKey, String(nextWidth));
+        } catch (error) {
+            console.warn(error);
+        }
+    }
+    on_window_resize();
+    updateFloatingChromeOffsets();
+}
+
+function restoreSketchIdeWidth() {
+    var storedWidth = null;
+    try {
+        storedWidth = Number(localStorage.getItem(sketchIdeWidthStorageKey));
+    } catch (error) {
+        console.warn(error);
+    }
+    applySketchIdeWidth(storedWidth || defaultSketchIdeWidth(), false);
+}
+
+function beginSketchResize(event) {
+    document.body.classList.add("is-resizing-sketch");
+    if (sketchResizer.setPointerCapture) {
+        sketchResizer.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+}
+
+function resizeSketchIde(event) {
+    if (!document.body.classList.contains("is-resizing-sketch")) return;
+    applySketchIdeWidth(window.innerWidth - event.clientX, true);
+}
+
+function endSketchResize(event) {
+    if (!document.body.classList.contains("is-resizing-sketch")) return;
+    document.body.classList.remove("is-resizing-sketch");
+    if (sketchResizer.releasePointerCapture) {
+        try {
+            sketchResizer.releasePointerCapture(event.pointerId);
+        } catch (error) {
+            console.warn(error);
+        }
+    }
+    on_window_resize();
+    updateFloatingChromeOffsets();
+}
+
+function updateFloatingChromeOffsets() {
+    updateSketchLayoutMetrics();
+    var chrome = document.body && document.body.classList.contains("sketch-mode")
+        ? document.getElementById("sketch-review-dock")
+        : document.getElementById("transport-bar");
+    if (!chrome || !document.documentElement) return;
+    var rect = chrome.getBoundingClientRect();
+    var safeBottom = Math.max(64, Math.ceil(window.innerHeight - rect.top + 16));
+    document.documentElement.style.setProperty("--transport-safe-bottom", safeBottom + "px");
+    updateSketchLayoutMetrics();
+}
+
+function updateSketchLayoutMetrics() {
+    if (!document.body || !document.documentElement) return;
+    var isSketchMode = document.body.classList.contains("sketch-mode");
+    var dock = document.getElementById("sketch-review-dock");
+    if (!isSketchMode || !dock) {
+        return;
+    }
+    var rootStyles = getComputedStyle(document.documentElement);
+    var ideWidth = Number.parseFloat(rootStyles.getPropertyValue("--sketch-ide-width")) || clampSketchIdeWidth(defaultSketchIdeWidth());
+    var minShellWidth = Math.ceil(sketchMinimumStageWidth + sketchGap + ideWidth);
+    var shellWidth = Math.max(window.innerWidth, minShellWidth);
+    var leftWidth = Math.max(sketchMinimumStageWidth, Math.ceil(shellWidth - ideWidth - sketchGap));
+    document.documentElement.style.setProperty("--sketch-min-shell-width", minShellWidth + "px");
+    document.documentElement.style.setProperty("--sketch-shell-width", shellWidth + "px");
+    document.documentElement.style.setProperty("--sketch-left-width", leftWidth + "px");
 }
 
 function revokeCompareResultUrls() {
@@ -518,6 +626,20 @@ function showCompareResult(engine, job, blob, songName) {
 
 function setStrudelStatus(message) {
     strudelStatus.textContent = message;
+    if (!strudelCodeInput) return;
+    strudelCodeInput.classList.remove("is-generating", "is-error", "is-ready");
+    var lowerMessage = String(message || "").toLowerCase();
+    if (lowerMessage.indexOf("generating") >= 0) {
+        strudelCodeInput.classList.add("is-generating");
+    } else if (lowerMessage.indexOf("error") >= 0
+        || lowerMessage.indexOf("failed") >= 0
+        || lowerMessage.indexOf("unavailable") >= 0
+        || lowerMessage.indexOf("invalid") >= 0
+        || lowerMessage.indexOf("unable") >= 0) {
+        strudelCodeInput.classList.add("is-error");
+    } else {
+        strudelCodeInput.classList.add("is-ready");
+    }
 }
 
 function resetStrudelResult(message) {
@@ -533,6 +655,7 @@ function resetStrudelResult(message) {
     strudelMetrics.textContent = "Waiting for MIDI metrics";
     downloadStrudelLink.removeAttribute("href");
     downloadStrudelLink.removeAttribute("download");
+    resetNoteActivity();
     if (message) {
         setStrudelStatus(message);
     }
@@ -867,7 +990,9 @@ function generateStrudelFromCurrentMidi() {
     setAiSketchStatus(aiModelSelect.value === "mimo-v2.5-pro"
         ? "Generating sketch from MIDI... MiMo may take 1-3 minutes."
         : "Generating sketch from MIDI...");
-    setAiSketchMeta(summary.warnings.join(" "));
+    setAiSketchMeta(summary.warnings.concat([
+        "Uses current source MIDI only, first " + summary.bars + " bars, representative melody/bass, and no exact channel/control/program reconstruction."
+    ]).join(" "));
     midiToStrudelButton.disabled = true;
     fetchAiMidiSketch({
         model: aiModelSelect.value,
@@ -937,6 +1062,12 @@ function showStrudelResult(payload) {
     } catch (error) {
         console.warn(error);
         strudelMetrics.textContent = "Analysis unavailable · " + formatBytes(strudelMidiBlob.size);
+    }
+    try {
+        renderNoteActivity(bytes, { bars: payload.bars });
+    } catch (error) {
+        console.warn(error);
+        resetNoteActivity("Analysis unavailable");
     }
 }
 
@@ -2437,6 +2568,157 @@ function midiSketchSummary(bytes, options) {
     };
 }
 
+function midiNoteActivity(bytes, options) {
+    options = options || {};
+    if (bytesToText(bytes, 0, 4) !== "MThd") {
+        throw new Error("Invalid MIDI header");
+    }
+    var headerLength = readUint32(bytes, 4);
+    var division = readUint16(bytes, 12);
+    if (division <= 0 || (division & 0x8000)) {
+        throw new Error("Note Activity needs ticks-per-quarter timing.");
+    }
+    var offset = 8 + headerLength;
+    var output = {
+        notes: [],
+        maxTick: 0,
+        bpm: 0,
+        beatsPerBar: 0
+    };
+
+    while (offset + 8 <= bytes.length) {
+        var chunkType = bytesToText(bytes, offset, 4);
+        var chunkLength = readUint32(bytes, offset + 4);
+        var chunkStart = offset + 8;
+        var chunkEnd = chunkStart + chunkLength;
+        if (chunkEnd > bytes.length) {
+            throw new Error("MIDI track chunk exceeds file length");
+        }
+        if (chunkType === "MTrk") {
+            collectMidiSketchNotes(bytes, chunkStart, chunkEnd, division, output);
+        }
+        offset = chunkEnd;
+    }
+
+    var bars = Number(options.bars) || Number(strudelBarsSelect.value) || 8;
+    var beatsPerBar = output.beatsPerBar || 4;
+    var maxNoteBeat = output.notes.reduce(function (maxBeat, note) {
+        return Math.max(maxBeat, note.startBeat + note.durationBeats);
+    }, 0);
+    var totalBeats = Math.max(bars * beatsPerBar, maxNoteBeat, beatsPerBar);
+    return {
+        notes: output.notes,
+        bars: Math.max(1, Math.ceil(totalBeats / beatsPerBar)),
+        beatsPerBar: beatsPerBar,
+        totalBeats: totalBeats
+    };
+}
+
+function resetNoteActivity(message) {
+    if (!noteActivityGrid || !noteActivitySummary) return;
+    noteActivitySummary.textContent = message || "Generate MIDI to view note activity";
+    noteActivityGrid.classList.add("is-empty");
+    noteActivityGrid.innerHTML = "";
+    var empty = document.createElement("span");
+    empty.className = "note-activity-empty";
+    empty.textContent = message || "Generate MIDI to view note activity";
+    noteActivityGrid.appendChild(empty);
+    resetNoteDensity(message);
+}
+
+function resetNoteDensity(message) {
+    if (!noteDensityGrid || !noteDensitySummary) return;
+    noteDensitySummary.textContent = message ? "Unavailable" : "Waiting for MIDI";
+    noteDensityGrid.classList.add("is-empty");
+    noteDensityGrid.innerHTML = "";
+    var empty = document.createElement("span");
+    empty.className = "note-density-empty";
+    empty.textContent = message || "Generate MIDI";
+    noteDensityGrid.appendChild(empty);
+}
+
+function renderNoteDensity(activity) {
+    if (!noteDensityGrid || !noteDensitySummary) return;
+    var barCount = Math.max(1, Math.min(activity.bars, 16));
+    var buckets = [];
+    for (var index = 0; index < barCount; index += 1) {
+        buckets.push({ notes: 0, velocityTotal: 0 });
+    }
+    activity.notes.forEach(function (note) {
+        var barIndex = Math.max(0, Math.min(barCount - 1, Math.floor(note.startBeat / activity.beatsPerBar)));
+        buckets[barIndex].notes += 1;
+        buckets[barIndex].velocityTotal += note.velocity || 64;
+    });
+    var maxNotes = buckets.reduce(function (maxValue, bucket) {
+        return Math.max(maxValue, bucket.notes);
+    }, 1);
+
+    noteDensityGrid.classList.remove("is-empty");
+    noteDensityGrid.innerHTML = "";
+    noteDensityGrid.style.gridTemplateColumns = "repeat(" + barCount + ", minmax(0, 1fr))";
+    buckets.forEach(function (bucket, index) {
+        var bar = document.createElement("span");
+        var averageVelocity = bucket.notes ? bucket.velocityTotal / bucket.notes : 0;
+        var height = bucket.notes ? Math.max(14, Math.round((bucket.notes / maxNotes) * 100)) : 8;
+        var alpha = bucket.notes ? Math.max(0.28, Math.min(0.95, averageVelocity / 127)) : 0.16;
+        bar.className = "note-density-bar";
+        bar.title = "Bar " + (index + 1) + " · " + formatCount(bucket.notes, "note", "notes")
+            + (bucket.notes ? " · avg velocity " + Math.round(averageVelocity) : "");
+        bar.style.height = height + "%";
+        bar.style.opacity = String(alpha);
+        noteDensityGrid.appendChild(bar);
+    });
+    noteDensitySummary.textContent = "Bars " + barCount + " · peak " + formatCount(maxNotes, "note", "notes");
+}
+
+function renderNoteActivity(bytes, options) {
+    if (!noteActivityGrid || !noteActivitySummary) return;
+    var activity = midiNoteActivity(bytes, options);
+    if (!activity.notes.length) {
+        resetNoteActivity("No notes found in generated MIDI");
+        return;
+    }
+
+    var pitches = activity.notes.map(function (note) {
+        return note.pitch;
+    });
+    var minPitch = Math.min.apply(null, pitches);
+    var maxPitch = Math.max.apply(null, pitches);
+    var pitchSpan = Math.max(1, maxPitch - minPitch);
+    var visibleNotes = activity.notes.slice().sort(function (a, b) {
+        return a.startBeat - b.startBeat || a.pitch - b.pitch;
+    }).slice(0, 180);
+
+    noteActivityGrid.classList.remove("is-empty");
+    noteActivityGrid.innerHTML = "";
+    noteActivityGrid.style.backgroundSize = "calc(100% / " + Math.min(activity.bars, 16) + ") 100%, 100% 18.75%";
+    noteActivitySummary.textContent = formatCount(activity.notes.length, "note", "notes")
+        + " · " + midiNoteName(minPitch) + "-" + midiNoteName(maxPitch)
+        + " · " + formatCount(activity.bars, "bar", "bars");
+
+    for (var barIndex = 1; barIndex <= Math.min(activity.bars, 16); barIndex += 1) {
+        var label = document.createElement("span");
+        label.className = "note-activity-bar-label";
+        label.textContent = String(barIndex);
+        label.style.left = ((barIndex - 1) / activity.bars * 100) + "%";
+        noteActivityGrid.appendChild(label);
+    }
+
+    visibleNotes.forEach(function (note) {
+        var block = document.createElement("span");
+        var left = Math.max(0, Math.min(100, (note.startBeat / activity.totalBeats) * 100));
+        var width = Math.max(0.7, Math.min(100 - left, (note.durationBeats / activity.totalBeats) * 100));
+        var top = 12 + ((maxPitch - note.pitch) / pitchSpan) * 78;
+        block.className = "note-block";
+        block.title = midiNoteName(note.pitch) + " · beat " + note.startBeat.toFixed(2);
+        block.style.left = left + "%";
+        block.style.width = width + "%";
+        block.style.top = top + "%";
+        noteActivityGrid.appendChild(block);
+    });
+    renderNoteDensity(activity);
+}
+
 function noteNameForOffset(offset) {
     var absoluteNote = controls.octave * 12 + offset;
     return noteNames[absoluteNote % 12] + Math.floor(absoluteNote / 12);
@@ -3039,7 +3321,7 @@ function strudelErrorMessage(error) {
 function aiSketchErrorMessage(error) {
     var message = error && error.message ? error.message : "";
     if (message.indexOf("Failed to fetch") >= 0 || message.indexOf("NetworkError") >= 0) {
-        return "AI sketch service unavailable. Start Docker and retry.";
+        return "AI sketch service unavailable. Run docker compose up -d ai-sketch-service and retry.";
     }
     if (message.indexOf("API key is not configured") >= 0) {
         return "Model key not configured in Docker environment.";
@@ -3270,13 +3552,23 @@ var activeKeyHolds = {};
 var activePointerKey = null;
     
 var clock = new THREE.Clock();
-    
+
+function stageViewportWidth() {
+    if (document.body.classList.contains("sketch-mode") && sketchPanel && !sketchPanel.hidden) {
+        updateSketchLayoutMetrics();
+        var leftWidth = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sketch-left-width"));
+        return Math.max(320, Math.round(leftWidth || (window.innerWidth - sketchPanel.getBoundingClientRect().width)));
+    }
+    return window.innerWidth;
+}
+
 function on_window_resize() //设置大小
 {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    var stageWidth = stageViewportWidth();
+    camera.aspect = stageWidth / window.innerHeight;
     camera.updateProjectionMatrix(); //每渲染一次重新计算一次
     
-    renderer.setSize(window.innerWidth, window.innerHeight); //渲染区域大小
+    renderer.setSize(stageWidth, window.innerHeight); //渲染区域大小
 }
 //场景准备
 function prepare_scene(collada) {
@@ -3541,7 +3833,10 @@ renderer.domElement.addEventListener("touchcancel", onPianoTouchEnd, true);
 window.onload = function () {
     loadStrudelExample(defaultStrudelExample, "Ready to sketch");
     renderStrudelDrafts();
+    resetNoteActivity();
+    restoreSketchIdeWidth();
     setWorkspaceMode("transcribe");
+    updateFloatingChromeOffsets();
     populateSongSelect();
     renderKeyboardMap();
     updatePresetFields();
@@ -3584,6 +3879,11 @@ window.onload = function () {
     duplicateStrudelDraftButton.onclick = duplicateStrudelDraft;
     tidyStrudelButton.onclick = tidyStrudelSource;
     clearStrudelButton.onclick = clearStrudelSource;
+    sketchResizer.onpointerdown = beginSketchResize;
+    window.addEventListener("pointermove", resizeSketchIde);
+    window.addEventListener("pointerup", endSketchResize);
+    window.addEventListener("resize", restoreSketchIdeWidth);
+    window.addEventListener("resize", updateFloatingChromeOffsets);
     arrangementPresetSelect.onchange = function () {
         updatePresetFields();
         resetPresetMidi();

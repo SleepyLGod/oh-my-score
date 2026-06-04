@@ -84,6 +84,8 @@ services:
         condition: service_healthy
       strudel-sketch-service:
         condition: service_healthy
+      ai-sketch-service:
+        condition: service_healthy
 
   basic-pitch:
     profiles:
