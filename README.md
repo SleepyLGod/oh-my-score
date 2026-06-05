@@ -80,6 +80,16 @@ The Pages workflow publishes [`apps/piano-player`](./apps/piano-player/).
 Static hosting supports MIDI playback and the 3D piano UI. Audio-to-MIDI
 conversion requires the local Docker backend.
 
+## Static Demo vs Local Studio
+
+GitHub Pages and Vercel run Oh-My-Score as a static frontend preview. Hosted
+static pages support demo MIDI playback, local MIDI opening, Smart Score
+analysis, timeline review, cleanup, and preset exports for loaded MIDI.
+
+Audio transcription, Basic Pitch, Compare mode, Strudel MIDI generation, and AI
+Sketch require the local Docker services. Run the local studio with
+`docker compose up --build` when you need the complete workflow.
+
 ## Isolated Local Run
 
 Runtime caches, the ONNX model, and generated files stay under `.isolation/`.

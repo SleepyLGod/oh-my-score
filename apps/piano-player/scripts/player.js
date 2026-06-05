@@ -31,6 +31,7 @@ var loopEnabled = false;
 var loopRestartQueued = false;
 var uploadPanel = document.getElementById("upload-panel");
 var settingsPanel = document.getElementById("settings-panel");
+var staticPreviewBanner = document.getElementById("static-preview-banner");
 var workspaceModeInputs = Array.prototype.slice.call(document.querySelectorAll('input[name="workspace-mode"]'));
 var uploadFileInput = document.getElementById("audio-file");
 var midiFileInput = document.getElementById("midi-file");
@@ -298,9 +299,13 @@ var keyboardLayoutRows = [
 ];
 var keyCodeToOffset = {};
 
-function defaultTranscriptionApiUrl() {
+function isLocalFrontendHost() {
     var host = window.location.hostname;
-    if (host === "localhost" || host === "127.0.0.1" || host === "") {
+    return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "";
+}
+
+function defaultTranscriptionApiUrl() {
+    if (isLocalFrontendHost()) {
         return localTranscriptionApiUrl;
     }
     return "";
@@ -310,27 +315,91 @@ function defaultTranscriptionJobsApiUrl() {
     if (transcriptionApiUrl) {
         return transcriptionApiUrl.replace(/\/(?:audioToMidiWithFile|mp3ToMidiWithFile)$/, "/jobs");
     }
-    var host = window.location.hostname;
-    if (host === "localhost" || host === "127.0.0.1" || host === "") {
+    if (isLocalFrontendHost()) {
         return localTranscriptionJobsApiUrl;
     }
     return "";
 }
 
 function defaultStrudelSketchApiUrl() {
-    var host = window.location.hostname;
-    if (host === "localhost" || host === "127.0.0.1" || host === "") {
+    if (isLocalFrontendHost()) {
         return localStrudelSketchApiUrl;
     }
     return "";
 }
 
 function defaultAiSketchApiUrl() {
-    var host = window.location.hostname;
-    if (host === "localhost" || host === "127.0.0.1" || host === "") {
+    if (isLocalFrontendHost()) {
         return localAiSketchApiUrl;
     }
     return "";
+}
+
+function hasTranscriptionService() {
+    return Boolean(transcriptionApiUrl || transcriptionJobsApiUrl);
+}
+
+function hasStrudelSketchService() {
+    return Boolean(strudelSketchApiUrl);
+}
+
+function hasAiSketchService() {
+    return Boolean(aiSketchApiUrl);
+}
+
+function isHostedStaticMode() {
+    return !isLocalFrontendHost()
+        && !hasTranscriptionService()
+        && !hasStrudelSketchService()
+        && !hasAiSketchService();
+}
+
+function conversionWaitingStatus() {
+    if (!uploadFileInput.files.length) return "Waiting";
+    return hasTranscriptionService()
+        ? "Ready to convert"
+        : "Static preview: audio conversion requires local Docker.";
+}
+
+function setButtonAvailability(button, available, title) {
+    if (!button) return;
+    button.disabled = !available;
+    if (title) {
+        button.title = title;
+    } else {
+        button.removeAttribute("title");
+    }
+}
+
+function updateLocalServiceControls() {
+    var hostedStatic = isHostedStaticMode();
+    document.body.classList.toggle("static-preview-mode", hostedStatic);
+    document.body.dataset.runtimeMode = hostedStatic ? "static-preview" : "local-studio";
+    if (staticPreviewBanner) {
+        staticPreviewBanner.hidden = !hostedStatic;
+    }
+
+    setButtonAvailability(
+        generateStrudelButton,
+        hasStrudelSketchService(),
+        hasStrudelSketchService() ? "" : "Strudel MIDI generation requires local Docker."
+    );
+    [generateAiSketchButton, midiToStrudelButton, explainAiSketchButton, applyAiEditButton].forEach(function (button) {
+        setButtonAvailability(
+            button,
+            hasAiSketchService(),
+            hasAiSketchService() ? "" : "AI Sketch requires local Docker and a configured model key."
+        );
+    });
+}
+
+function applyRuntimeModeMessaging() {
+    updateLocalServiceControls();
+    if (!isHostedStaticMode()) return;
+    setUploadStatus("Static preview: audio conversion requires local Docker.");
+    setStrudelStatus("Static preview: Generate MIDI requires local Docker.");
+    setAiSketchStatus("Static preview: AI Sketch requires local Docker.");
+    setAiSketchMeta("Demo MIDI, Open MIDI, playback, Smart Score, cleanup, and presets still work in this hosted preview.");
 }
 
 function setUploadStatus(message) {
@@ -669,7 +738,9 @@ function loadStrudelExample(key, message) {
     var exampleKey = strudelExamples[key] ? key : defaultStrudelExample;
     strudelExampleSelect.value = exampleKey;
     strudelCodeInput.value = strudelExamples[exampleKey];
-    resetStrudelResult(message || "Example loaded. Generate MIDI when ready.");
+    resetStrudelResult(message || (hasStrudelSketchService()
+        ? "Example loaded. Generate MIDI when ready."
+        : "Static preview: Generate MIDI requires local Docker."));
 }
 
 function readStrudelDrafts() {
@@ -890,6 +961,10 @@ function applyAiExplanation(payload) {
 }
 
 function explainAiStrudelPattern() {
+    if (!hasAiSketchService()) {
+        setAiSketchStatus("Static preview: AI Sketch requires local Docker.");
+        return;
+    }
     if (!strudelCodeInput.value.trim()) {
         setAiSketchStatus("Add Strudel code first.");
         strudelCodeInput.focus();
@@ -904,7 +979,7 @@ function explainAiStrudelPattern() {
         console.error(error);
         setAiSketchStatus(aiSketchErrorMessage(error));
     }).finally(function () {
-        explainAiSketchButton.disabled = false;
+        explainAiSketchButton.disabled = !hasAiSketchService();
     });
 }
 
@@ -919,6 +994,10 @@ function applyAiEdit(payload) {
 }
 
 function editAiStrudelPattern() {
+    if (!hasAiSketchService()) {
+        setAiSketchStatus("Static preview: AI Sketch requires local Docker.");
+        return;
+    }
     var instruction = aiEditPromptInput.value.trim();
     if (!strudelCodeInput.value.trim()) {
         setAiSketchStatus("Add Strudel code first.");
@@ -941,11 +1020,15 @@ function editAiStrudelPattern() {
         console.error(error);
         setAiSketchStatus(aiSketchErrorMessage(error));
     }).finally(function () {
-        applyAiEditButton.disabled = false;
+        applyAiEditButton.disabled = !hasAiSketchService();
     });
 }
 
 function generateAiStrudelPattern() {
+    if (!hasAiSketchService()) {
+        setAiSketchStatus("Static preview: AI Sketch requires local Docker.");
+        return;
+    }
     var prompt = aiPromptInput.value.trim();
     if (!prompt) {
         setAiSketchStatus("Describe the sketch first.");
@@ -967,11 +1050,15 @@ function generateAiStrudelPattern() {
         console.error(error);
         setAiSketchStatus(aiSketchErrorMessage(error));
     }).finally(function () {
-        generateAiSketchButton.disabled = false;
+        generateAiSketchButton.disabled = !hasAiSketchService();
     });
 }
 
 function generateStrudelFromCurrentMidi() {
+    if (!hasAiSketchService()) {
+        setAiSketchStatus("Static preview: MIDI-to-Strudel requires local Docker AI service.");
+        return;
+    }
     if (!activeMidiBytes) {
         setAiSketchStatus("Load a source MIDI before creating a sketch.");
         return;
@@ -1007,7 +1094,7 @@ function generateStrudelFromCurrentMidi() {
         console.error(error);
         setAiSketchStatus(aiSketchErrorMessage(error));
     }).finally(function () {
-        midiToStrudelButton.disabled = false;
+        midiToStrudelButton.disabled = !hasAiSketchService();
     });
 }
 
@@ -1072,6 +1159,10 @@ function showStrudelResult(payload) {
 }
 
 function generateStrudelSketch() {
+    if (!hasStrudelSketchService()) {
+        setStrudelStatus("Static preview: Strudel MIDI generation requires local Docker.");
+        return;
+    }
     resetStrudelResult();
     setStrudelStatus("Generating MIDI sketch...");
     generateStrudelButton.disabled = true;
@@ -1086,7 +1177,7 @@ function generateStrudelSketch() {
         console.error(error);
         setStrudelStatus(strudelErrorMessage(error));
     }).finally(function () {
-        generateStrudelButton.disabled = false;
+        generateStrudelButton.disabled = !hasStrudelSketchService();
     });
 }
 
@@ -1118,8 +1209,13 @@ function setMidiStatus(message, statusClass) {
 }
 
 function updateUploadButton() {
-    convertButton.disabled = !midiReady || !uploadFileInput.files.length;
+    convertButton.disabled = !midiReady || !uploadFileInput.files.length || !hasTranscriptionService();
     convertButton.textContent = currentConversionMode() === "compare" ? "Compare Engines" : "Convert to MIDI";
+    if (hasTranscriptionService()) {
+        convertButton.removeAttribute("title");
+    } else {
+        convertButton.title = "Audio conversion requires local Docker backend.";
+    }
 }
 
 function songNameFromFile(file) {
@@ -3212,7 +3308,7 @@ uploadFileInput.onchange = function () {
     setSourceAudioPreview(file || null);
     hideConversionResult();
     hideCompareResults();
-    setUploadStatus(file ? "Ready to convert" : "Waiting");
+    setUploadStatus(conversionWaitingStatus());
     updateUploadButton();
 };
 
@@ -3251,7 +3347,7 @@ convertButton.onclick = function () {
     var file = uploadFileInput.files[0];
     if (!file) return;
     if (!transcriptionApiUrl && !transcriptionJobsApiUrl) {
-        setUploadStatus("Needs local Docker backend");
+        setUploadStatus("Static preview: audio conversion requires local Docker backend.");
         return;
     }
 
@@ -3346,7 +3442,7 @@ conversionModeInputs.forEach(function (input) {
         hideConversionResult();
         hideCompareResults();
         updateUploadButton();
-        setUploadStatus(uploadFileInput.files.length ? "Ready to convert" : "Waiting");
+        setUploadStatus(conversionWaitingStatus());
     };
 });
 
@@ -3921,6 +4017,7 @@ window.onload = function () {
     noteColorInput.oninput = function () {
         setNoteColorFromHex(noteColorInput.value);
     };
+    applyRuntimeModeMessaging();
     MIDI.loadPlugin({
         instruments: presetSoundfontInstruments,
         callback: function () {

@@ -22,7 +22,7 @@
         <script src="./vendor/OrbitAndPanControls.js"></script>
         <script src="./vendor/ColladaLoader.js"></script>
 
-        <link rel="stylesheet" href="./styles/player.css?v=studio-shell-v2">
+        <link rel="stylesheet" href="./styles/player.css?v=public-demo-v3">
     </head>
     <body>
         <div id="scene-vignette"></div>
@@ -50,6 +50,10 @@
                     <span id="midi-status-text">Loading soundfonts</span>
                 </span>
             </header>
+            <div id="static-preview-banner" class="static-preview-banner" hidden>
+                <strong>Static preview mode</strong>
+                <span>Demo MIDI, Open MIDI, playback, Smart Score, cleanup, and presets work here. Audio conversion, Strudel generation, and AI Sketch need local Docker.</span>
+            </div>
 
             <section id="upload-panel" class="panel source-panel">
                 <h2 class="panel-title">
@@ -492,6 +496,6 @@
             </div>
             <div id="copyright">Copyright © Von Lu</div>
         </div>
-        <script src="./scripts/player.js?v=studio-shell-v2" type="text/javascript"></script>
+        <script src="./scripts/player.js?v=public-demo-v3" type="text/javascript"></script>
     </body>
 </html>

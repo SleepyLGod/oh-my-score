@@ -175,6 +175,38 @@ select {
     background: var(--danger);
     box-shadow: 0 0 14px rgba(255, 122, 122, 0.85);
 }
+.static-preview-banner {
+    position: absolute;
+    top: 70px;
+    left: 50%;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(760px, calc(100vw - 44px));
+    padding: 9px 12px;
+    border: 1px solid rgba(240, 179, 90, 0.34);
+    border-radius: 8px;
+    background: rgba(24, 18, 12, 0.86);
+    box-shadow: var(--shadow), var(--panel-glow);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.35;
+    pointer-events: auto;
+    transform: translateX(-50%);
+}
+.static-preview-banner[hidden] {
+    display: none;
+}
+.static-preview-banner strong {
+    flex: 0 0 auto;
+    color: var(--warning);
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
 .panel {
     width: min(350px, calc(100vw - 44px));
     border: 1px solid var(--line);
@@ -2008,4 +2040,12 @@ body.sketch-mode .note-activity {
     body:not(.sketch-mode) .stage-tips {
         left: var(--studio-gap);
     }
+}
+body.static-preview-mode:not(.sketch-mode) #upload-panel,
+body.static-preview-mode:not(.sketch-mode) #settings-panel {
+    top: 122px;
+    max-height: calc(100vh - 280px);
+}
+body.static-preview-mode.sketch-mode #sketch-panel {
+    top: 122px;
 }
