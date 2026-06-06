@@ -352,6 +352,12 @@ draft tools, generated MIDI output, and a lightweight Note Activity view. This
 does not change the Transcribe workflow and does not turn Sketch into a full
 live Strudel REPL.
 
+Sketch Code Editor status: V1 done. The Strudel source editor now uses a
+locally bundled CodeMirror 5 editor with JavaScript highlighting, line numbers,
+bracket matching, editor status, and keyboard shortcuts for Generate MIDI and
+Save Draft. This remains a fixed-length code-to-MIDI sketch workflow, not a full
+live Strudel REPL.
+
 Cleanup controls status: V1 done. Smart Score cleanup now exposes short-note,
 duplicate-overlap, and velocity normalization controls while preserving the
 previous default behavior and keeping cleaned MIDI as a separate variant.
@@ -377,8 +383,9 @@ Acceptance criteria:
 The main V1 workflow is complete. Future work should be picked deliberately from
 this backlog instead of being treated as the next required step:
 
-1. Continue deeper Strudel editor polish only if code-to-MIDI sketching becomes
-   a frequent workflow; keep it separate from transcription claims.
+1. Consider deeper Strudel editor features such as search, diagnostics, or
+   multi-file snippets only if code-to-MIDI sketching becomes a frequent
+   workflow; keep it separate from transcription claims.
 2. Verify an optional Vercel static deployment only after a project is linked;
    GitHub Pages remains the primary hosted demo for now.
 3. Keep MT3-style multi-instrument transcription as future research until there

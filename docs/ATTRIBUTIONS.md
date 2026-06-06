@@ -16,3 +16,10 @@ Attribution-ShareAlike 3.0 license.
 
 Only the selected browser-ready MIDI.js soundfont files are bundled. Oh-My-Score
 does not load the soundfonts from a remote CDN at runtime.
+
+## CodeMirror
+
+The Sketch editor bundles CodeMirror 5.65.20 locally under
+`apps/piano-player/vendor/codemirror/` for JavaScript editing, line numbers, and
+bracket matching. CodeMirror is distributed under the MIT License; see
+`apps/piano-player/vendor/codemirror/LICENSE`.

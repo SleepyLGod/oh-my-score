@@ -654,7 +654,7 @@ body.is-resizing-sketch .sketch-resizer::after {
 }
 .sketch-editor-pane {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
     gap: 12px;
 }
 .sketch-editor-bar {
@@ -786,6 +786,132 @@ body.sketch-mode #strudel-code.is-error {
     box-shadow:
         0 0 0 3px rgba(255, 122, 122, 0.08),
         inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror {
+    height: 100%;
+    min-height: 0;
+    border: 1px solid rgba(245, 239, 228, 0.15);
+    border-radius: 8px;
+    background:
+        linear-gradient(90deg, rgba(54, 214, 197, 0.06), transparent 36px),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 72px),
+        #05080b;
+    color: #f8f1e6;
+    font-family: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.66;
+    letter-spacing: 0;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.045),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.28),
+        0 18px 48px rgba(0, 0, 0, 0.18);
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror-focused {
+    border-color: rgba(54, 214, 197, 0.5);
+    box-shadow:
+        0 0 0 3px rgba(54, 214, 197, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror.is-ready {
+    border-color: rgba(245, 239, 228, 0.16);
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror.is-generating {
+    border-color: rgba(54, 214, 197, 0.55);
+    background:
+        linear-gradient(90deg, rgba(54, 214, 197, 0.085), transparent 36px),
+        linear-gradient(180deg, rgba(54, 214, 197, 0.045), transparent 72px),
+        #05080b;
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror.is-error {
+    border-color: rgba(255, 122, 122, 0.56);
+    box-shadow:
+        0 0 0 3px rgba(255, 122, 122, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror-scroll {
+    padding: 14px 0 14px 0;
+    scrollbar-color: rgba(54, 214, 197, 0.34) rgba(255, 255, 255, 0.05);
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror-lines {
+    padding: 0;
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror pre.CodeMirror-line,
+body.sketch-mode .sketch-editor-pane .CodeMirror pre.CodeMirror-line-like {
+    padding: 0 18px;
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror-gutters {
+    border-right: 1px solid rgba(245, 239, 228, 0.1);
+    background: rgba(255, 255, 255, 0.028);
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror-linenumber {
+    color: rgba(245, 239, 228, 0.36);
+    font-size: 11px;
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror-cursor {
+    border-left-color: var(--accent);
+}
+body.sketch-mode .sketch-editor-pane div.CodeMirror-selected {
+    background: rgba(54, 214, 197, 0.28);
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror-activeline-background {
+    background: rgba(255, 255, 255, 0.04);
+}
+body.sketch-mode .sketch-editor-pane .CodeMirror-matchingbracket {
+    color: #fffaf0;
+    background: rgba(54, 214, 197, 0.2);
+    outline: 1px solid rgba(54, 214, 197, 0.34);
+}
+body.sketch-mode .sketch-editor-pane .cm-keyword {
+    color: #ffb86b;
+}
+body.sketch-mode .sketch-editor-pane .cm-def,
+body.sketch-mode .sketch-editor-pane .cm-variable-2 {
+    color: #7bdff0;
+}
+body.sketch-mode .sketch-editor-pane .cm-variable,
+body.sketch-mode .sketch-editor-pane .cm-property {
+    color: #f8f1e6;
+}
+body.sketch-mode .sketch-editor-pane .cm-string {
+    color: #9ee493;
+}
+body.sketch-mode .sketch-editor-pane .cm-number {
+    color: #d7b7ff;
+}
+body.sketch-mode .sketch-editor-pane .cm-comment {
+    color: rgba(245, 239, 228, 0.42);
+    font-style: italic;
+}
+body.sketch-mode .sketch-editor-pane .cm-operator,
+body.sketch-mode .sketch-editor-pane .cm-bracket {
+    color: rgba(248, 241, 230, 0.82);
+}
+.strudel-editor-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    min-height: 30px;
+    padding: 7px 10px;
+    border: 1px solid rgba(245, 239, 228, 0.09);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.2;
+}
+.strudel-editor-status span {
+    white-space: nowrap;
+}
+.strudel-editor-status .strudel-shortcut-hint {
+    margin-left: auto;
+    color: rgba(245, 239, 228, 0.5);
+}
+#strudel-dirty-status.is-saved {
+    color: #7df0a6;
+}
+#strudel-dirty-status.is-edited {
+    color: #ffd27a;
 }
 .sketch-side-pane {
     display: grid;

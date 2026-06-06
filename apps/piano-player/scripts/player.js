@@ -64,6 +64,9 @@ var explainAiSketchButton = document.getElementById("explain-ai-sketch-button");
 var applyAiEditButton = document.getElementById("apply-ai-edit-button");
 var aiSketchStatus = document.getElementById("ai-sketch-status");
 var aiSketchMeta = document.getElementById("ai-sketch-meta");
+var strudelCursorStatus = document.getElementById("strudel-cursor-status");
+var strudelCharacterStatus = document.getElementById("strudel-character-status");
+var strudelDirtyStatus = document.getElementById("strudel-dirty-status");
 var strudelDraftSelect = document.getElementById("strudel-draft-select");
 var saveStrudelDraftButton = document.getElementById("save-strudel-draft-button");
 var loadStrudelDraftButton = document.getElementById("load-strudel-draft-button");
@@ -155,6 +158,8 @@ var sketchMinimumStageWidth = 700;
 var sketchGap = 22;
 var activePlaybackIsPreview = false;
 var previewRestoreState = null;
+var strudelEditor = null;
+var strudelEditorCleanSource = "";
 var presetPlaybackOptions = null;
 var isSeekingTimeline = false;
 var wasPlayingBeforeSeek = false;
@@ -489,6 +494,7 @@ function setWorkspaceMode(mode) {
     document.body.classList.toggle("sketch-mode", isSketchMode);
     if (isSketchMode) {
         restoreSketchIdeWidth();
+        refreshStrudelEditor();
     }
     on_window_resize();
     updateFloatingChromeOffsets();
@@ -693,21 +699,119 @@ function showCompareResult(engine, job, blob, songName) {
     downloadLink.download = downloadName;
 }
 
+function getStrudelSource() {
+    if (strudelEditor) {
+        return strudelEditor.getValue();
+    }
+    return strudelCodeInput ? strudelCodeInput.value : "";
+}
+
+function updateStrudelEditorStatus() {
+    var source = getStrudelSource();
+    if (strudelCursorStatus) {
+        var cursor = strudelEditor ? strudelEditor.getCursor() : { line: 0, ch: 0 };
+        strudelCursorStatus.textContent = "Ln " + (cursor.line + 1) + ", Col " + (cursor.ch + 1);
+    }
+    if (strudelCharacterStatus) {
+        strudelCharacterStatus.textContent = formatCount(source.length, "char", "chars");
+    }
+    if (strudelDirtyStatus) {
+        var isEdited = source !== strudelEditorCleanSource;
+        strudelDirtyStatus.textContent = isEdited ? "Edited" : "Saved";
+        strudelDirtyStatus.classList.toggle("is-edited", isEdited);
+        strudelDirtyStatus.classList.toggle("is-saved", !isEdited);
+    }
+}
+
+function refreshStrudelEditor() {
+    if (!strudelEditor) return;
+    window.setTimeout(function () {
+        strudelEditor.refresh();
+    }, 0);
+}
+
+function setStrudelSource(source, options) {
+    var nextSource = source || "";
+    if (strudelEditor) {
+        strudelEditor.setValue(nextSource);
+    } else if (strudelCodeInput) {
+        strudelCodeInput.value = nextSource;
+    }
+    if (options && options.markClean) {
+        strudelEditorCleanSource = nextSource;
+    }
+    updateStrudelEditorStatus();
+    refreshStrudelEditor();
+}
+
+function markStrudelEditorClean() {
+    strudelEditorCleanSource = getStrudelSource();
+    updateStrudelEditorStatus();
+}
+
+function focusStrudelEditor() {
+    if (strudelEditor) {
+        strudelEditor.focus();
+    } else if (strudelCodeInput) {
+        strudelCodeInput.focus();
+    }
+}
+
+function strudelEditorElement() {
+    return strudelEditor ? strudelEditor.getWrapperElement() : strudelCodeInput;
+}
+
+function strudelEditorShortcut(editor, event) {
+    if (!event || !(event.metaKey || event.ctrlKey)) return;
+    if (event.key === "Enter") {
+        event.preventDefault();
+        generateStrudelSketch();
+        return;
+    }
+    if (String(event.key || "").toLowerCase() === "s") {
+        event.preventDefault();
+        saveStrudelDraft();
+    }
+}
+
+function initializeStrudelEditor() {
+    if (!strudelCodeInput || !window.CodeMirror) {
+        updateStrudelEditorStatus();
+        return;
+    }
+    strudelEditor = window.CodeMirror.fromTextArea(strudelCodeInput, {
+        mode: "javascript",
+        lineNumbers: true,
+        lineWrapping: false,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        styleActiveLine: true,
+        tabSize: 2,
+        indentUnit: 2,
+        indentWithTabs: false
+    });
+    strudelEditor.on("change", updateStrudelEditorStatus);
+    strudelEditor.on("cursorActivity", updateStrudelEditorStatus);
+    strudelEditor.on("keydown", strudelEditorShortcut);
+    markStrudelEditorClean();
+}
+
 function setStrudelStatus(message) {
     strudelStatus.textContent = message;
-    if (!strudelCodeInput) return;
-    strudelCodeInput.classList.remove("is-generating", "is-error", "is-ready");
+    var editorElement = strudelEditorElement();
+    if (!editorElement) return;
+    editorElement.classList.remove("is-generating", "is-error", "is-ready");
     var lowerMessage = String(message || "").toLowerCase();
     if (lowerMessage.indexOf("generating") >= 0) {
-        strudelCodeInput.classList.add("is-generating");
+        editorElement.classList.add("is-generating");
     } else if (lowerMessage.indexOf("error") >= 0
         || lowerMessage.indexOf("failed") >= 0
         || lowerMessage.indexOf("unavailable") >= 0
         || lowerMessage.indexOf("invalid") >= 0
         || lowerMessage.indexOf("unable") >= 0) {
-        strudelCodeInput.classList.add("is-error");
+        editorElement.classList.add("is-error");
     } else {
-        strudelCodeInput.classList.add("is-ready");
+        editorElement.classList.add("is-ready");
     }
 }
 
@@ -737,7 +841,7 @@ function selectedStrudelExample() {
 function loadStrudelExample(key, message) {
     var exampleKey = strudelExamples[key] ? key : defaultStrudelExample;
     strudelExampleSelect.value = exampleKey;
-    strudelCodeInput.value = strudelExamples[exampleKey];
+    setStrudelSource(strudelExamples[exampleKey], { markClean: true });
     resetStrudelResult(message || (hasStrudelSketchService()
         ? "Example loaded. Generate MIDI when ready."
         : "Static preview: Generate MIDI requires local Docker."));
@@ -803,10 +907,10 @@ function newDraftTitle(prefix) {
 }
 
 function saveStrudelDraft() {
-    var source = strudelCodeInput.value;
+    var source = getStrudelSource();
     if (!source.trim()) {
         setStrudelStatus("Add Strudel code before saving a draft.");
-        strudelCodeInput.focus();
+        focusStrudelEditor();
         return;
     }
     var drafts = readStrudelDrafts();
@@ -825,6 +929,7 @@ function saveStrudelDraft() {
     }
     if (writeStrudelDrafts(drafts)) {
         renderStrudelDrafts(draft.id);
+        markStrudelEditorClean();
         resetStrudelResult("Draft saved locally.");
     }
 }
@@ -838,7 +943,7 @@ function loadStrudelDraft() {
         setStrudelStatus("No local draft selected.");
         return;
     }
-    strudelCodeInput.value = draft.source;
+    setStrudelSource(draft.source, { markClean: true });
     resetStrudelResult("Draft loaded. Generate MIDI when ready.");
 }
 
@@ -847,7 +952,7 @@ function duplicateStrudelDraft() {
     var sourceDraft = readStrudelDrafts().find(function (item) {
         return item.id === selectedId;
     });
-    var source = sourceDraft ? sourceDraft.source : strudelCodeInput.value;
+    var source = sourceDraft ? sourceDraft.source : getStrudelSource();
     if (!source.trim()) {
         setStrudelStatus("No draft content to duplicate.");
         return;
@@ -862,24 +967,24 @@ function duplicateStrudelDraft() {
     drafts.unshift(copy);
     if (writeStrudelDrafts(drafts)) {
         renderStrudelDrafts(copy.id);
-        strudelCodeInput.value = source;
+        setStrudelSource(source, { markClean: true });
         resetStrudelResult("Draft duplicated locally.");
     }
 }
 
 function tidyStrudelSource() {
-    strudelCodeInput.value = strudelCodeInput.value
+    setStrudelSource(getStrudelSource()
         .split("\n")
         .map(function (line) {
             return line.replace(/\s+$/g, "");
         })
         .join("\n")
-        .trim() + "\n";
+        .trim() + "\n");
     resetStrudelResult("Sketch tidied. Generate MIDI when ready.");
 }
 
 function clearStrudelSource() {
-    strudelCodeInput.value = "";
+    setStrudelSource("");
     resetStrudelResult("Sketch cleared");
 }
 
@@ -932,7 +1037,7 @@ function fetchAiMidiSketch(payload) {
 function currentAiSourcePayload() {
     return {
         model: aiModelSelect.value,
-        source: strudelCodeInput.value,
+        source: getStrudelSource(),
         style: aiStyleSelect.value,
         bars: strudelBarsSelect.value,
         bpm: strudelBpmInput.value
@@ -940,7 +1045,7 @@ function currentAiSourcePayload() {
 }
 
 function applyAiSketchSuggestion(payload) {
-    strudelCodeInput.value = payload.source || "";
+    setStrudelSource(payload.source || "");
     resetStrudelResult("AI pattern ready. Review code, then Generate MIDI.");
     var warningText = Array.isArray(payload.warnings) && payload.warnings.length
         ? " Warnings: " + payload.warnings.join(" ")
@@ -965,9 +1070,9 @@ function explainAiStrudelPattern() {
         setAiSketchStatus("Static preview: AI Sketch requires local Docker.");
         return;
     }
-    if (!strudelCodeInput.value.trim()) {
+    if (!getStrudelSource().trim()) {
         setAiSketchStatus("Add Strudel code first.");
-        strudelCodeInput.focus();
+        focusStrudelEditor();
         return;
     }
     setAiSketchStatus(aiModelSelect.value === "mimo-v2.5-pro"
@@ -984,7 +1089,7 @@ function explainAiStrudelPattern() {
 }
 
 function applyAiEdit(payload) {
-    strudelCodeInput.value = payload.source || "";
+    setStrudelSource(payload.source || "");
     resetStrudelResult("AI edit applied. Review code, then Generate MIDI.");
     var warningText = Array.isArray(payload.warnings) && payload.warnings.length
         ? " Warnings: " + payload.warnings.join(" ")
@@ -999,9 +1104,9 @@ function editAiStrudelPattern() {
         return;
     }
     var instruction = aiEditPromptInput.value.trim();
-    if (!strudelCodeInput.value.trim()) {
+    if (!getStrudelSource().trim()) {
         setAiSketchStatus("Add Strudel code first.");
-        strudelCodeInput.focus();
+        focusStrudelEditor();
         return;
     }
     if (!instruction) {
@@ -1167,7 +1272,7 @@ function generateStrudelSketch() {
     setStrudelStatus("Generating MIDI sketch...");
     generateStrudelButton.disabled = true;
     fetchStrudelSketch({
-        source: strudelCodeInput.value,
+        source: getStrudelSource(),
         bars: strudelBarsSelect.value,
         bpm: strudelBpmInput.value
     }).then(function (payload) {
@@ -3927,6 +4032,7 @@ renderer.domElement.addEventListener("touchend", onPianoTouchEnd, true);
 renderer.domElement.addEventListener("touchcancel", onPianoTouchEnd, true);
     
 window.onload = function () {
+    initializeStrudelEditor();
     loadStrudelExample(defaultStrudelExample, "Ready to sketch");
     renderStrudelDrafts();
     resetNoteActivity();
