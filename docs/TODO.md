@@ -379,5 +379,7 @@ this backlog instead of being treated as the next required step:
 
 1. Continue deeper Strudel editor polish only if code-to-MIDI sketching becomes
    a frequent workflow; keep it separate from transcription claims.
-2. Keep MT3-style multi-instrument transcription as future research until there
+2. Verify an optional Vercel static deployment only after a project is linked;
+   GitHub Pages remains the primary hosted demo for now.
+3. Keep MT3-style multi-instrument transcription as future research until there
    is a reproducible Docker prototype and a clear UI contract.
