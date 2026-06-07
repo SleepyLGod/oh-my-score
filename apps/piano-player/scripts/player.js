@@ -72,6 +72,7 @@ var strudelDiagnosticPhase = document.getElementById("strudel-diagnostic-phase")
 var strudelDiagnosticLocation = document.getElementById("strudel-diagnostic-location");
 var strudelDiagnosticMessage = document.getElementById("strudel-diagnostic-message");
 var strudelDiagnosticJumpButton = document.getElementById("strudel-diagnostic-jump-button");
+var fixStrudelDiagnosticButton = document.getElementById("fix-strudel-diagnostic-button");
 var strudelDraftSelect = document.getElementById("strudel-draft-select");
 var saveStrudelDraftButton = document.getElementById("save-strudel-draft-button");
 var loadStrudelDraftButton = document.getElementById("load-strudel-draft-button");
@@ -169,6 +170,8 @@ var strudelEditorCleanSource = "";
 var strudelDiagnosticLine = null;
 var strudelDiagnosticColumn = null;
 var strudelDiagnosticLineIndex = null;
+var latestStrudelDiagnostic = null;
+var strudelDiagnosticFixRequestId = 0;
 var presetPlaybackOptions = null;
 var isSeekingTimeline = false;
 var wasPlayingBeforeSeek = false;
@@ -405,6 +408,7 @@ function updateLocalServiceControls() {
             hasAiSketchService() ? "" : "AI Sketch requires local Docker and a configured model key."
         );
     });
+    updateStrudelDiagnosticFixAvailability();
 }
 
 function applyRuntimeModeMessaging() {
@@ -779,6 +783,13 @@ function strudelEditorElement() {
     return strudelEditor ? strudelEditor.getWrapperElement() : strudelCodeInput;
 }
 
+function handleStrudelEditorChange() {
+    updateStrudelEditorStatus();
+    if (latestStrudelDiagnostic) {
+        clearStrudelDiagnostic();
+    }
+}
+
 function strudelEditorShortcut(editor, event) {
     if (!event || !(event.metaKey || event.ctrlKey)) return;
     if (event.key === "Enter") {
@@ -800,7 +811,10 @@ function strudelEditorShortcut(editor, event) {
 function initializeStrudelEditor() {
     if (!strudelCodeInput || !window.CodeMirror) {
         if (strudelCodeInput) {
-            strudelCodeInput.addEventListener("keydown", strudelEditorShortcut);
+            strudelCodeInput.addEventListener("keydown", function (event) {
+                strudelEditorShortcut(null, event);
+            });
+            strudelCodeInput.addEventListener("input", handleStrudelEditorChange);
         }
         updateStrudelEditorStatus();
         return;
@@ -824,7 +838,7 @@ function initializeStrudelEditor() {
             "Ctrl-F": "findPersistent"
         }
     });
-    strudelEditor.on("change", updateStrudelEditorStatus);
+    strudelEditor.on("change", handleStrudelEditorChange);
     strudelEditor.on("cursorActivity", updateStrudelEditorStatus);
     markStrudelEditorClean();
 }
@@ -838,8 +852,26 @@ function clearStrudelDiagnosticLine() {
     strudelDiagnosticLineIndex = null;
 }
 
+function updateStrudelDiagnosticFixAvailability() {
+    if (!fixStrudelDiagnosticButton) return;
+    var hasDiagnostic = Boolean(latestStrudelDiagnostic);
+    var hasAiService = hasAiSketchService();
+    fixStrudelDiagnosticButton.hidden = !hasDiagnostic;
+    fixStrudelDiagnosticButton.disabled = !hasDiagnostic || !hasAiService;
+    if (!hasDiagnostic) {
+        fixStrudelDiagnosticButton.removeAttribute("title");
+    } else if (!hasAiService) {
+        fixStrudelDiagnosticButton.title = "Fix with AI requires local Docker AI service and a configured model key.";
+    } else {
+        fixStrudelDiagnosticButton.title = "Ask the selected model to revise this Strudel source.";
+    }
+}
+
 function clearStrudelDiagnostic() {
     clearStrudelDiagnosticLine();
+    latestStrudelDiagnostic = null;
+    strudelDiagnosticFixRequestId += 1;
+    updateStrudelDiagnosticFixAvailability();
     if (!strudelDiagnostic) return;
     strudelDiagnostic.hidden = true;
     strudelDiagnosticPhase.textContent = "Generation error";
@@ -889,14 +921,37 @@ function jumpToStrudelDiagnostic() {
     strudelEditor.scrollIntoView({ line: lineIndex, ch: columnIndex }, 96);
 }
 
+function strudelDiagnosticFixInstruction(diagnostic) {
+    var location = diagnostic.line
+        ? "Location: line " + diagnostic.line + (diagnostic.column ? ", column " + diagnostic.column : "")
+        : "Location: unavailable";
+    return [
+        "Fix the current Strudel source so it can generate MIDI.",
+        "Keep the same musical idea, bars, BPM, and supported pitch-only Strudel style.",
+        "Address this error only.",
+        "",
+        "Phase: " + (diagnostic.phase || "unknown"),
+        location,
+        "Error:",
+        diagnostic.message || "Unknown Strudel generation error."
+    ].join("\n");
+}
+
 function showStrudelDiagnostic(error) {
     if (!strudelDiagnostic) return;
     clearStrudelDiagnosticLine();
     var payload = strudelDiagnosticPayload(error || {});
     var line = payload.line;
     var column = payload.column;
+    latestStrudelDiagnostic = {
+        phase: payload.phase || "",
+        line: line,
+        column: column,
+        message: cleanDiagnosticMessage(payload.message),
+        source: getStrudelSource()
+    };
     strudelDiagnosticPhase.textContent = diagnosticPhaseLabel(payload.phase);
-    strudelDiagnosticMessage.textContent = cleanDiagnosticMessage(payload.message);
+    strudelDiagnosticMessage.textContent = latestStrudelDiagnostic.message;
     if (line !== null) {
         strudelDiagnosticLine = line;
         strudelDiagnosticColumn = column;
@@ -914,6 +969,7 @@ function showStrudelDiagnostic(error) {
         strudelDiagnosticJumpButton.hidden = true;
     }
     strudelDiagnostic.hidden = false;
+    updateStrudelDiagnosticFixAvailability();
 }
 
 function setStrudelStatus(message) {
@@ -1226,6 +1282,20 @@ function applyAiEdit(payload) {
     setAiSketchStatus("Edited with " + (payload.model || "model"));
 }
 
+function applyAiDiagnosticFix(payload, requestSource, requestId) {
+    var source = payload && payload.source ? payload.source : "";
+    if (!source.trim()) {
+        setStrudelStatus("AI fix returned no source. Diagnostic remains unchanged.");
+        return;
+    }
+    if (requestId !== strudelDiagnosticFixRequestId || getStrudelSource() !== requestSource) {
+        setStrudelStatus("AI fix discarded because the editor changed. Review current code, then Generate MIDI.");
+        return;
+    }
+    setStrudelSource(source);
+    resetStrudelResult("AI fix applied. Review code, then Generate MIDI.");
+}
+
 function editAiStrudelPattern() {
     if (!hasAiSketchService()) {
         setAiSketchStatus("Static preview: AI Sketch requires local Docker.");
@@ -1255,6 +1325,39 @@ function editAiStrudelPattern() {
     }).finally(function () {
         applyAiEditButton.disabled = !hasAiSketchService();
     });
+}
+
+function fixStrudelDiagnosticWithAi() {
+    if (!latestStrudelDiagnostic) {
+        setStrudelStatus("Generate a diagnostic before using AI fix.");
+        return;
+    }
+    if (!hasAiSketchService()) {
+        setStrudelStatus("AI fix requires local Docker AI service.");
+        updateStrudelDiagnosticFixAvailability();
+        return;
+    }
+    var diagnostic = latestStrudelDiagnostic;
+    var requestSource = diagnostic.source || getStrudelSource();
+    var requestId = strudelDiagnosticFixRequestId + 1;
+    strudelDiagnosticFixRequestId = requestId;
+    setStrudelStatus(aiModelSelect.value === "mimo-v2.5-pro"
+        ? "Fixing diagnostic... MiMo may take 1-3 minutes."
+        : "Fixing diagnostic with AI...");
+    fixStrudelDiagnosticButton.disabled = true;
+    fetchAiSketchRequest("/edit", {
+        model: aiModelSelect.value,
+        source: diagnostic.source || getStrudelSource(),
+        style: aiStyleSelect.value,
+        bars: strudelBarsSelect.value,
+        bpm: strudelBpmInput.value,
+        instruction: strudelDiagnosticFixInstruction(diagnostic)
+    }).then(function (payload) {
+        applyAiDiagnosticFix(payload, requestSource, requestId);
+    }).catch(function (error) {
+        console.error(error);
+        setStrudelStatus(aiSketchErrorMessage(error));
+    }).finally(updateStrudelDiagnosticFixAvailability);
 }
 
 function generateAiStrudelPattern() {
@@ -4222,6 +4325,7 @@ window.onload = function () {
     tidyStrudelButton.onclick = tidyStrudelSource;
     clearStrudelButton.onclick = clearStrudelSource;
     strudelDiagnosticJumpButton.onclick = jumpToStrudelDiagnostic;
+    fixStrudelDiagnosticButton.onclick = fixStrudelDiagnosticWithAi;
     sketchResizer.onpointerdown = beginSketchResize;
     window.addEventListener("pointermove", resizeSketchIde);
     window.addEventListener("pointerup", endSketchResize);

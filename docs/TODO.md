@@ -363,6 +363,10 @@ The editor can open CodeMirror search, and Strudel generation failures can show 
 compact diagnostic with best-effort line/column navigation when the sidecar can
 map the error back to the current pattern source.
 
+AI diagnostic fix status: V1 done. The Strudel diagnostic panel can offer a
+contextual Fix with AI action that reuses the existing `/edit` flow, replaces
+editor source only after validation, and leaves MIDI generation explicit.
+
 Cleanup controls status: V1 done. Smart Score cleanup now exposes short-note,
 duplicate-overlap, and velocity normalization controls while preserving the
 previous default behavior and keeping cleaned MIDI as a separate variant.

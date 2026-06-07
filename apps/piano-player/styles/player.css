@@ -977,10 +977,18 @@ body.sketch-mode .sketch-editor-pane .cm-bracket {
     margin-top: 3px;
     font-size: 13px;
 }
+.sketch-diagnostic-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    flex: 0 0 auto;
+}
 .sketch-diagnostic .secondary-button {
     min-height: 30px;
     padding: 0 9px;
     font-size: 11px;
+    white-space: nowrap;
 }
 #strudel-diagnostic-message {
     max-height: 150px;
