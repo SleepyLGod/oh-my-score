@@ -358,6 +358,11 @@ bracket matching, editor status, and keyboard shortcuts for Generate MIDI and
 Save Draft. This remains a fixed-length code-to-MIDI sketch workflow, not a full
 live Strudel REPL.
 
+Sketch Editor DX status: V1 done for local search and generate-time diagnostics.
+The editor can open CodeMirror search, and Strudel generation failures can show a
+compact diagnostic with best-effort line/column navigation when the sidecar can
+map the error back to the current pattern source.
+
 Cleanup controls status: V1 done. Smart Score cleanup now exposes short-note,
 duplicate-overlap, and velocity normalization controls while preserving the
 previous default behavior and keeping cleaned MIDI as a separate variant.
@@ -383,7 +388,7 @@ Acceptance criteria:
 The main V1 workflow is complete. Future work should be picked deliberately from
 this backlog instead of being treated as the next required step:
 
-1. Consider deeper Strudel editor features such as search, diagnostics, or
+1. Consider deeper Strudel editor features such as replace, lint diagnostics, or
    multi-file snippets only if code-to-MIDI sketching becomes a frequent
    workflow; keep it separate from transcription claims.
 2. Verify an optional Vercel static deployment only after a project is linked;

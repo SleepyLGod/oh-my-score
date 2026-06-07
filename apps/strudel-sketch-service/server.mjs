@@ -229,6 +229,41 @@ function runExporter(patternPath, outputDir, bars, bpm) {
   });
 }
 
+function parsePatternErrorLocation(message) {
+  const text = String(message || "");
+  const locationMatch = text.match(/pattern\.mjs:(\d+)(?::(\d+))?/);
+  if (!locationMatch) return {};
+  const line = Number(locationMatch[1]);
+  let column = locationMatch[2] ? Number(locationMatch[2]) : null;
+  if (!column) {
+    const lines = text.split(/\r?\n/);
+    const locationIndex = lines.findIndex((candidate) => candidate.includes("pattern.mjs:"));
+    const caretLine = lines.slice(locationIndex + 1, locationIndex + 5).find((candidate) => candidate.includes("^"));
+    if (caretLine) {
+      column = caretLine.indexOf("^") + 1;
+    }
+  }
+  return {
+    ...(Number.isFinite(line) && line > 0 ? { line } : {}),
+    ...(Number.isFinite(column) && column > 0 ? { column } : {})
+  };
+}
+
+function annotateSketchError(error, phase) {
+  error.phase = phase;
+  Object.assign(error, parsePatternErrorLocation(error.message));
+  return error;
+}
+
+function sketchErrorPayload(error) {
+  return {
+    error: error.message || "Strudel sketch generation failed.",
+    ...(error.phase ? { phase: error.phase } : {}),
+    ...(Number.isFinite(error.line) ? { line: error.line } : {}),
+    ...(Number.isFinite(error.column) ? { column: error.column } : {})
+  };
+}
+
 async function newestMidiFile(outputDir) {
   const entries = await fs.readdir(outputDir, { withFileTypes: true });
   const midiFiles = [];
@@ -256,8 +291,17 @@ async function generateSketch(payload) {
   try {
     await fs.mkdir(outputDir, { recursive: true });
     await fs.writeFile(patternPath, options.source, "utf8");
-    await runSyntaxCheck(patternPath);
-    const log = await runExporter(patternPath, outputDir, options.bars, options.bpm);
+    try {
+      await runSyntaxCheck(patternPath);
+    } catch (error) {
+      throw annotateSketchError(error, "syntax");
+    }
+    let log;
+    try {
+      log = await runExporter(patternPath, outputDir, options.bars, options.bpm);
+    } catch (error) {
+      throw annotateSketchError(error, "export");
+    }
     const midiPath = await newestMidiFile(outputDir);
     const midiBytes = await fs.readFile(midiPath);
     return {
@@ -293,7 +337,7 @@ async function handleRequest(request, response) {
       const payload = await readJsonBody(request);
       sendJson(request, response, 200, await generateSketch(payload));
     } catch (error) {
-      sendJson(request, response, error.statusCode || 400, { error: error.message || "Strudel sketch generation failed." });
+      sendJson(request, response, error.statusCode || 400, sketchErrorPayload(error));
     }
     return;
   }

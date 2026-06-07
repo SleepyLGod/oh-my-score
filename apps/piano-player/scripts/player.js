@@ -67,10 +67,16 @@ var aiSketchMeta = document.getElementById("ai-sketch-meta");
 var strudelCursorStatus = document.getElementById("strudel-cursor-status");
 var strudelCharacterStatus = document.getElementById("strudel-character-status");
 var strudelDirtyStatus = document.getElementById("strudel-dirty-status");
+var strudelDiagnostic = document.getElementById("strudel-diagnostic");
+var strudelDiagnosticPhase = document.getElementById("strudel-diagnostic-phase");
+var strudelDiagnosticLocation = document.getElementById("strudel-diagnostic-location");
+var strudelDiagnosticMessage = document.getElementById("strudel-diagnostic-message");
+var strudelDiagnosticJumpButton = document.getElementById("strudel-diagnostic-jump-button");
 var strudelDraftSelect = document.getElementById("strudel-draft-select");
 var saveStrudelDraftButton = document.getElementById("save-strudel-draft-button");
 var loadStrudelDraftButton = document.getElementById("load-strudel-draft-button");
 var duplicateStrudelDraftButton = document.getElementById("duplicate-strudel-draft-button");
+var findStrudelButton = document.getElementById("find-strudel-button");
 var resetStrudelExampleButton = document.getElementById("reset-strudel-example-button");
 var tidyStrudelButton = document.getElementById("tidy-strudel-button");
 var clearStrudelButton = document.getElementById("clear-strudel-button");
@@ -160,6 +166,9 @@ var activePlaybackIsPreview = false;
 var previewRestoreState = null;
 var strudelEditor = null;
 var strudelEditorCleanSource = "";
+var strudelDiagnosticLine = null;
+var strudelDiagnosticColumn = null;
+var strudelDiagnosticLineIndex = null;
 var presetPlaybackOptions = null;
 var isSeekingTimeline = false;
 var wasPlayingBeforeSeek = false;
@@ -757,6 +766,15 @@ function focusStrudelEditor() {
     }
 }
 
+function openStrudelSearch() {
+    if (strudelEditor && window.CodeMirror && window.CodeMirror.commands.findPersistent) {
+        strudelEditor.focus();
+        strudelEditor.execCommand("findPersistent");
+        return;
+    }
+    focusStrudelEditor();
+}
+
 function strudelEditorElement() {
     return strudelEditor ? strudelEditor.getWrapperElement() : strudelCodeInput;
 }
@@ -771,11 +789,19 @@ function strudelEditorShortcut(editor, event) {
     if (String(event.key || "").toLowerCase() === "s") {
         event.preventDefault();
         saveStrudelDraft();
+        return;
+    }
+    if (String(event.key || "").toLowerCase() === "f" && strudelEditor) {
+        event.preventDefault();
+        openStrudelSearch();
     }
 }
 
 function initializeStrudelEditor() {
     if (!strudelCodeInput || !window.CodeMirror) {
+        if (strudelCodeInput) {
+            strudelCodeInput.addEventListener("keydown", strudelEditorShortcut);
+        }
         updateStrudelEditorStatus();
         return;
     }
@@ -788,12 +814,106 @@ function initializeStrudelEditor() {
         styleActiveLine: true,
         tabSize: 2,
         indentUnit: 2,
-        indentWithTabs: false
+        indentWithTabs: false,
+        extraKeys: {
+            "Cmd-Enter": generateStrudelSketch,
+            "Ctrl-Enter": generateStrudelSketch,
+            "Cmd-S": saveStrudelDraft,
+            "Ctrl-S": saveStrudelDraft,
+            "Cmd-F": "findPersistent",
+            "Ctrl-F": "findPersistent"
+        }
     });
     strudelEditor.on("change", updateStrudelEditorStatus);
     strudelEditor.on("cursorActivity", updateStrudelEditorStatus);
-    strudelEditor.on("keydown", strudelEditorShortcut);
     markStrudelEditorClean();
+}
+
+function clearStrudelDiagnosticLine() {
+    if (strudelEditor && strudelDiagnosticLineIndex !== null) {
+        strudelEditor.removeLineClass(strudelDiagnosticLineIndex, "background", "cm-strudel-diagnostic-line");
+    }
+    strudelDiagnosticLine = null;
+    strudelDiagnosticColumn = null;
+    strudelDiagnosticLineIndex = null;
+}
+
+function clearStrudelDiagnostic() {
+    clearStrudelDiagnosticLine();
+    if (!strudelDiagnostic) return;
+    strudelDiagnostic.hidden = true;
+    strudelDiagnosticPhase.textContent = "Generation error";
+    strudelDiagnosticLocation.hidden = true;
+    strudelDiagnosticLocation.textContent = "";
+    strudelDiagnosticMessage.textContent = "";
+    strudelDiagnosticJumpButton.hidden = true;
+}
+
+function diagnosticLineFromValue(value) {
+    var line = Number(value);
+    return Number.isFinite(line) && line > 0 ? Math.floor(line) : null;
+}
+
+function diagnosticColumnFromValue(value) {
+    var column = Number(value);
+    return Number.isFinite(column) && column > 0 ? Math.floor(column) : null;
+}
+
+function strudelDiagnosticPayload(error) {
+    var payload = error && error.diagnostic ? error.diagnostic : {};
+    return {
+        phase: payload.phase || error.phase || "",
+        line: diagnosticLineFromValue(payload.line || error.line),
+        column: diagnosticColumnFromValue(payload.column || error.column),
+        message: payload.error || error.diagnosticMessage || error.message || "Sketch generation failed."
+    };
+}
+
+function diagnosticPhaseLabel(phase) {
+    if (phase === "syntax") return "Syntax check";
+    if (phase === "export") return "MIDI export";
+    if (phase === "validation") return "Validation";
+    return "Generation error";
+}
+
+function cleanDiagnosticMessage(message) {
+    return String(message || "Sketch generation failed.").replace(/^HTTP \d+:\s*/, "");
+}
+
+function jumpToStrudelDiagnostic() {
+    if (!strudelEditor || strudelDiagnosticLine === null) return;
+    var lineIndex = Math.max(0, Math.min(strudelEditor.lineCount() - 1, strudelDiagnosticLine - 1));
+    var columnIndex = Math.max(0, (strudelDiagnosticColumn || 1) - 1);
+    strudelEditor.focus();
+    strudelEditor.setCursor({ line: lineIndex, ch: columnIndex });
+    strudelEditor.scrollIntoView({ line: lineIndex, ch: columnIndex }, 96);
+}
+
+function showStrudelDiagnostic(error) {
+    if (!strudelDiagnostic) return;
+    clearStrudelDiagnosticLine();
+    var payload = strudelDiagnosticPayload(error || {});
+    var line = payload.line;
+    var column = payload.column;
+    strudelDiagnosticPhase.textContent = diagnosticPhaseLabel(payload.phase);
+    strudelDiagnosticMessage.textContent = cleanDiagnosticMessage(payload.message);
+    if (line !== null) {
+        strudelDiagnosticLine = line;
+        strudelDiagnosticColumn = column;
+        strudelDiagnosticLocation.textContent = "Line " + line + (column ? ", column " + column : "");
+        strudelDiagnosticLocation.hidden = false;
+        strudelDiagnosticJumpButton.hidden = false;
+        if (strudelEditor) {
+            var lineIndex = Math.max(0, Math.min(strudelEditor.lineCount() - 1, line - 1));
+            strudelDiagnosticLineIndex = lineIndex;
+            strudelEditor.addLineClass(lineIndex, "background", "cm-strudel-diagnostic-line");
+            jumpToStrudelDiagnostic();
+        }
+    } else {
+        strudelDiagnosticLocation.hidden = true;
+        strudelDiagnosticJumpButton.hidden = true;
+    }
+    strudelDiagnostic.hidden = false;
 }
 
 function setStrudelStatus(message) {
@@ -819,6 +939,7 @@ function resetStrudelResult(message) {
     if (activePlaybackIsPreview && activeMidiUrl === strudelMidiUrl) {
         restorePlaybackAfterPreview();
     }
+    clearStrudelDiagnostic();
     revokeObjectUrl(strudelMidiUrl);
     strudelMidiUrl = null;
     strudelMidiBlob = null;
@@ -980,6 +1101,13 @@ function tidyStrudelSource() {
         })
         .join("\n")
         .trim() + "\n");
+    if (strudelEditor) {
+        strudelEditor.operation(function () {
+            for (var index = 0; index < strudelEditor.lineCount(); index += 1) {
+                strudelEditor.indentLine(index, "smart");
+            }
+        });
+    }
     resetStrudelResult("Sketch tidied. Generate MIDI when ready.");
 }
 
@@ -1214,7 +1342,13 @@ function bytesFromBase64(text) {
 
 function strudelJsonError(response, payload) {
     var message = payload && payload.error ? payload.error : response.statusText;
-    throw new Error("HTTP " + response.status + ": " + (message || "Strudel sketch request failed."));
+    var error = new Error("HTTP " + response.status + ": " + (message || "Strudel sketch request failed."));
+    error.diagnostic = payload || {};
+    error.phase = payload && payload.phase;
+    error.line = payload && payload.line;
+    error.column = payload && payload.column;
+    error.diagnosticMessage = message;
+    throw error;
 }
 
 function fetchStrudelSketch(payload) {
@@ -1281,6 +1415,7 @@ function generateStrudelSketch() {
     }).catch(function (error) {
         console.error(error);
         setStrudelStatus(strudelErrorMessage(error));
+        showStrudelDiagnostic(error);
     }).finally(function () {
         generateStrudelButton.disabled = !hasStrudelSketchService();
     });
@@ -3506,7 +3641,8 @@ function conversionErrorMessage(error) {
 }
 
 function strudelErrorMessage(error) {
-    var message = error && error.message ? error.message : "";
+    var message = error && error.diagnosticMessage ? error.diagnosticMessage : (error && error.message ? error.message : "");
+    message = message.replace(/^HTTP \d+:\s*/, "");
     if (message.indexOf("Failed to fetch") >= 0 || message.indexOf("NetworkError") >= 0) {
         return "Strudel service unavailable. Start Docker and retry.";
     }
@@ -3515,6 +3651,9 @@ function strudelErrorMessage(error) {
     }
     if (message.indexOf("timed out") >= 0) {
         return "Sketch generation timed out.";
+    }
+    if (error && error.diagnostic && error.diagnostic.phase) {
+        return "Sketch generation failed. Check diagnostic.";
     }
     return message || "Sketch generation failed.";
 }
@@ -4079,8 +4218,10 @@ window.onload = function () {
     saveStrudelDraftButton.onclick = saveStrudelDraft;
     loadStrudelDraftButton.onclick = loadStrudelDraft;
     duplicateStrudelDraftButton.onclick = duplicateStrudelDraft;
+    findStrudelButton.onclick = openStrudelSearch;
     tidyStrudelButton.onclick = tidyStrudelSource;
     clearStrudelButton.onclick = clearStrudelSource;
+    strudelDiagnosticJumpButton.onclick = jumpToStrudelDiagnostic;
     sketchResizer.onpointerdown = beginSketchResize;
     window.addEventListener("pointermove", resizeSketchIde);
     window.addEventListener("pointerup", endSketchResize);
