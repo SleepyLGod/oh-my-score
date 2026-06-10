@@ -62,7 +62,7 @@ https://sleepylgod.github.io/oh-my-score/
 ```
 
 Pages workflow 会发布 [`apps/piano-player`](./apps/piano-player/)。
-静态托管支持 MIDI 播放和 3D 钢琴 UI。音频转 MIDI 需要本地 Docker backend。
+静态托管支持 demo MIDI 播放、打开本地 MIDI、Smart Score 分析/清理、preset 导出和 3D 钢琴 UI；音频转 MIDI 仍需要本地 Docker backend。
 
 ## 静态 Demo vs 本地 Studio
 
