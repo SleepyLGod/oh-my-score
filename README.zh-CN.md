@@ -127,7 +127,7 @@ docker compose down
 - 浏览器播放：已支持打开本地 MIDI、3D 钢琴动画、timeline seek、bar/beat review、loop ranges、speed control 和交互式演奏输入。
 - Smart Score 工具：已支持 MIDI 分析、source export、保守 cleanup、preset variants、cleanup controls 和可配置的 Bass + Melody sketches。
 - Sketch mode：已通过 Docker-isolated sidecar 实现 docked code-to-MIDI IDE、固定长度 Strudel pattern export、example patterns、本地 draft controls、MIDI preview、source load、download 和 generated note activity。
-- 可选 AI Sketch：配置对应的本地 API key 后，`deepseek-v4-pro` 和 `mimo-v2.5-pro` 可以生成 editable Strudel pattern drafts。同一个本地 sidecar 可以把当前 MIDI explain、edit 或 summarize 成 Strudel code，但不会自动生成 MIDI。MiMo 内部使用 compact sketch-spec builder 来提升可靠性。
+- 可选 AI Sketch：配置对应的本地 API key 后，`deepseek-v4-pro` 和 `mimo-v2.5-pro` 可以生成可编辑的 Strudel pattern 草稿。同一个本地 sidecar 可以把当前 MIDI 解释、编辑或总结为 Strudel 代码，但不会自动生成 MIDI。MiMo 内部使用 compact sketch-spec builder 来提升可靠性。
 - 开发工作流：已配置 Docker 隔离、frontend CI、backend CI 和 GitHub Pages deploy。
 
 详见 [`docs/TODO.md`](./docs/TODO.md) 中的 Smart Score roadmap 和可选后续 backlog。开发验证和提交前检查见 [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)。
