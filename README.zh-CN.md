@@ -105,7 +105,7 @@ http://localhost:8091
 http://localhost:8092
 ```
 
-要启用 AI 生成的 Strudel drafts，请把 [`.env.example`](./.env.example) 复制为 `.env`，并至少设置一个模型密钥。`DEEPSEEK_API_KEY` 用于 `deepseek-v4-pro`；`XIAOMI_API_KEY` 用于 `mimo-v2.5-pro`（`MIMO_API_KEY` 也可作为兼容别名）。前端不会收到这些密钥；Docker sidecar 会在本地通过 OpenAI-compatible Chat Completions 转发所选模型。
+要启用 AI 生成的 Strudel 草稿，请把 [`.env.example`](./.env.example) 复制为 `.env`，并至少设置一个模型密钥。`DEEPSEEK_API_KEY` 用于 `deepseek-v4-pro`；`XIAOMI_API_KEY` 用于 `mimo-v2.5-pro`（`MIMO_API_KEY` 也可作为兼容别名）。前端不会收到这些密钥；Docker sidecar 会在本地通过兼容 OpenAI 的 Chat Completions 转发所选模型。
 
 如果页面已运行但 AI Sketch 提示 service unavailable，请执行 `docker compose up -d ai-sketch-service` 启动 sidecar 后重试。
 
