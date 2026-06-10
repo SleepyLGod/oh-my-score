@@ -111,7 +111,7 @@ http://localhost:8092
 
 MiMo Token Plan 密钥以 `tp-` 开头，应设置 `MIMO_BASE_URL=https://token-plan-cn.xiaomimimo.com/v1`。Pay-as-you-go 密钥以 `sk-` 开头，应使用小米控制台提供的 pay-as-you-go base URL。
 
-Sketch mode 会在 Docker sidecar 中执行用户提供的 Strudel JavaScript，而不是在主前端 bundle 中执行。服务只接受配置过的 frontend origins，会对生成请求做 rate limit，在导出前做 syntax check，并在 60 秒后终止导出。若要用于共享部署，请在把服务暴露到 localhost 之外以前先增加 Docker CPU 和 memory limits。
+Sketch mode 会在 Docker sidecar 中执行用户提供的 Strudel JavaScript，而不是在主前端 bundle 中执行。服务只接受配置过的 frontend origins，会对生成请求进行限流，在导出前进行语法检查，并在 60 秒后终止导出。若要用于共享部署，请在把服务暴露到 localhost 之外以前先增加 Docker CPU 和内存限制。
 
 停止服务：
 
