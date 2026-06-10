@@ -2,14 +2,18 @@
   <img src="./docs/assets/header.png" alt="Oh-My-Score studio header">
 </p>
 
+<h1 align="center">Oh-My-Score</h1>
+
 <p align="center">
-  <img src="https://readme-typing-svg.herokuapp.com/?font=Roboto+Mono&size=25&width=300&color=46BEA3&duration=1600&lines=Oh-My-Score" height="80" alt="Oh-My-Score"/>
-  <br>
-  <strong>Audio-to-MIDI transcription, browser playback, and Smart Score tools in one local-first studio.</strong>
+  <strong>A local-first music studio for audio-to-MIDI transcription, MIDI review, Smart Score cleanup, and Strudel code-to-MIDI sketches.</strong>
 </p>
 
 <p align="center">
-  English | <a href="./README.zh-CN.md">简体中文</a>
+  <a href="https://sleepylgod.github.io/oh-my-score/"><strong>Try Static Preview</strong></a>
+  ·
+  <a href="#local-studio-full-workflow"><strong>Run Local Studio</strong></a>
+  ·
+  <a href="./README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center">
@@ -25,100 +29,90 @@
     <td width="50%" align="center">
       <img src="./docs/assets/demo1.png" alt="Oh-My-Score Transcribe workspace" width="100%">
       <br>
-      <sub>Transcribe audio or MIDI, compare engines, inspect Smart Score results.</sub>
+      <strong>Transcribe Workspace</strong>
+      <br>
+      <sub>Convert audio or open MIDI, compare engines, inspect Smart Score analysis, clean and export variants.</sub>
     </td>
     <td width="50%" align="center">
       <img src="./docs/assets/demo2.png" alt="Oh-My-Score Sketch workspace" width="100%">
       <br>
-      <sub>Sketch Strudel code, use AI edits, preview MIDI, and review note activity.</sub>
+      <strong>Sketch Workspace</strong>
+      <br>
+      <sub>Write Strudel-style code, use optional AI edits, generate MIDI, preview results, and review note activity.</sub>
     </td>
   </tr>
 </table>
 
 ## Overview
 
-Oh-My-Score turns piano recordings and MIDI files into a playable, inspectable
-browser workflow. It combines local audio-to-MIDI transcription, a 3D piano
-player, MIDI analysis, cleanup/export tools, and simple arrangement sketches.
+Oh-My-Score turns recordings and MIDI files into a playable, inspectable browser
+workflow. It combines audio-to-MIDI transcription, a 3D piano player, MIDI
+analysis, conservative cleanup/export tools, simple General MIDI arrangement
+sketches, and a Strudel-inspired code-to-MIDI workspace.
 
-The project is built for local-first experimentation: the full stack runs
-through Docker, while the static frontend can also be published as a GitHub
-Pages demo for MIDI playback and UI exploration.
-
-## Who It Is For
-
-Oh-My-Score is intended for people who want a local, inspectable MIDI workflow,
-including:
-
-- Piano learners who want to turn practice recordings into playable MIDI for review.
-- MIDI hobbyists who like inspecting, cleaning, remixing, and exporting MIDI files.
-- DAW and MuseScore users who want downloadable MIDI they can continue editing in
-  their existing tools.
-- Local AI and music tooling experimenters who want Docker-isolated transcription,
-  sketching, and optional AI-assisted pattern drafts.
-- Developers evaluating transcription engines and comparing their outputs by
-  listening, loading, and inspecting generated MIDI.
-
-## Current Limitations
-
-- Audio-to-MIDI transcription quality depends on recording quality, polyphonic
-  complexity, background noise, instrument clarity, and the capabilities of the
-  selected model or engine.
-- Compare mode helps you listen to and inspect multiple engine outputs side by
-  side; it does not automatically judge which engine is better or choose a
-  winner for you.
-- Smart Score cleanup and presets are conservative MIDI utilities for analysis,
-  cleanup, and quick General MIDI variants; they are not a complete score layout
-  system or professional orchestration tool.
+The project is intentionally local-first. The complete workflow runs through
+Docker with repo-local runtime files under `.isolation/`. A static GitHub Pages
+preview is also available for MIDI playback, Smart Score inspection, and UI
+exploration without starting the backend services.
 
 ## What You Can Do
 
-- Convert MP3/WAV audio into standard MIDI files.
-- Choose Piano ONNX, Basic Pitch, or Compare mode for conversion.
-- Preview, load, and download generated MIDI results.
-- Inspect MIDI duration, tempo, tracks, channels, programs, notes, pitch range,
+### Transcribe And Review
+
+- Convert MP3/WAV recordings into standard MIDI files with async jobs.
+- Choose `piano-onnx`, `basic-pitch`, or Compare mode when running locally.
+- Listen to multiple engine outputs and decide which MIDI to load; the app does
+  not rank engines or select an output for you.
+- Open local MIDI files directly in the browser.
+- Inspect duration, tempo, tracks, channels, programs, note count, pitch range,
   and rough polyphony.
-- Export source MIDI, conservatively cleaned MIDI, and General MIDI preset
-  variants.
-- Create lightweight Piano, Strings, Soft Synth, and Bass + Melody arrangement
-  sketches.
-- Generate fixed-length code-to-MIDI sketches from Strudel-style pattern code,
-  or optionally ask a configured AI model for an editable pattern draft.
-- Play MIDI in a 3D piano studio with animated keys, timeline seek, loop, speed
-  control, mouse/touch input, and keyboard performance.
+- Seek through the timeline, review bar/beat context, set loop ranges, and
+  adjust playback speed.
 
-## Why Oh-My-Score
+### Clean, Export, And Arrange
 
-- Local-first: audio conversion runs on your machine instead of a hosted service.
-- Docker-isolated: no host Node, Java, Maven, or FFmpeg install is required.
-- Transparent: converted MIDI stays downloadable and reusable in MuseScore, DAWs,
-  and other MIDI editors.
-- User-choice workflow: Compare mode is for listening and inspection; Oh-My-Score
-  does not rank engines or select a result automatically.
+- Download the original source MIDI for demo, local, converted, or generated
+  MIDI.
+- Create a separate cleaned MIDI variant with conservative short-note,
+  duplicate-overlap, and velocity controls.
+- Export General MIDI preset variants for Piano, Strings, Soft Synth, and
+  Bass + Melody sketches.
+- Adjust the Bass + Melody split point without overwriting the source MIDI.
 
-## GitHub Pages Demo
+### Sketch MIDI With Code
+
+- Generate fixed-length MIDI sketches from editable Strudel-style JavaScript.
+- Use examples, local drafts, search, diagnostics, and editor shortcuts in the
+  docked Sketch workspace.
+- Summarize the current source MIDI into a simplified Strudel draft.
+- Optionally ask configured local AI models to generate, explain, edit, or help
+  repair Strudel code. AI output stays editable; MIDI generation is always an
+  explicit user action.
+
+## Try It
+
+| Mode | Best For | Works Without Docker | Needs Local Docker |
+| --- | --- | --- | --- |
+| Static Preview | Trying the UI, demo MIDI, local MIDI playback, Smart Score inspection | Demo MIDI, Open MIDI, playback, timeline, cleanup, presets | Audio transcription, Compare mode, Strudel generation, AI Sketch |
+| Local Studio | Full transcription and code-to-MIDI workflow | Not applicable | Backend transcription, Basic Pitch sidecar, Strudel sidecar, optional AI sidecar |
+
+### Static Preview
+
+Open the hosted GitHub Pages demo:
 
 ```text
 https://sleepylgod.github.io/oh-my-score/
 ```
 
-The Pages workflow publishes [`apps/piano-player`](./apps/piano-player/).
-Static hosting supports MIDI playback and the 3D piano UI. Audio-to-MIDI
-conversion requires the local Docker backend.
+Static hosting publishes [`apps/piano-player`](./apps/piano-player/). It can
+play demo MIDI, open local MIDI files, show Smart Score analysis, and export
+cleanup/preset variants for loaded MIDI. It cannot run local audio
+transcription, Basic Pitch, Compare mode, Strudel MIDI generation, or AI Sketch
+without the Docker services.
 
-## Static Demo vs Local Studio
+### Local Studio Full Workflow
 
-GitHub Pages and Vercel run Oh-My-Score as a static frontend preview. Hosted
-static pages support demo MIDI playback, local MIDI opening, Smart Score
-analysis, timeline review, cleanup, and preset exports for loaded MIDI.
-
-Audio transcription, Basic Pitch, Compare mode, Strudel MIDI generation, and AI
-Sketch require the local Docker services. Run the local studio with
-`docker compose up --build` when you need the complete workflow.
-
-## Isolated Local Run
-
-Runtime caches, the ONNX model, and generated files stay under `.isolation/`.
+Runtime caches, model files, and generated outputs stay under `.isolation/`.
 
 ```bash
 mkdir -p .isolation/models
@@ -127,50 +121,20 @@ curl -L -o .isolation/models/transcription.onnx \
 docker compose up --build
 ```
 
-Open the frontend:
+Open the studio:
 
 ```text
 http://localhost:8080
 ```
 
-The backend API listens on:
+Local services:
 
-```text
-http://localhost:8084
-```
-
-The Strudel sketch service listens on:
-
-```text
-http://localhost:8091
-```
-
-The optional AI sketch service listens on:
-
-```text
-http://localhost:8092
-```
-
-To enable AI-generated Strudel drafts, copy [`.env.example`](./.env.example) to
-`.env` and set at least one model key. Use `DEEPSEEK_API_KEY` for
-`deepseek-v4-pro`; use `XIAOMI_API_KEY` for `mimo-v2.5-pro`
-(`MIMO_API_KEY` is also accepted as a compatibility alias). The frontend never
-receives these keys; the Docker sidecar routes the selected model through
-OpenAI-compatible Chat Completions locally.
-
-If the page is running but AI Sketch reports that the service is unavailable,
-start the sidecar with `docker compose up -d ai-sketch-service` and retry.
-
-MiMo Token Plan keys start with `tp-` and should use
-`MIMO_BASE_URL=https://token-plan-cn.xiaomimimo.com/v1`. Pay-as-you-go keys
-start with `sk-` and should use the pay-as-you-go base URL from the Xiaomi
-console.
-
-Sketch mode executes user-supplied Strudel JavaScript inside the Docker
-sidecar, not in the main frontend bundle. The service accepts only configured
-frontend origins, rate-limits generation requests, syntax-checks patterns before
-export, and kills exports after 60 seconds. For shared deployments, add Docker
-CPU and memory limits before exposing the service beyond localhost.
+| Service | URL | Purpose |
+| --- | --- | --- |
+| Frontend | `http://localhost:8080` | 3D piano, Transcribe, Smart Score, Sketch UI |
+| Transcription API | `http://localhost:8084` | Audio-to-MIDI jobs and MIDI downloads |
+| Strudel sketch service | `http://localhost:8091` | Docker-isolated code-to-MIDI export |
+| AI sketch service | `http://localhost:8092` | Optional model-assisted Strudel drafts and edits |
 
 Stop the services:
 
@@ -180,6 +144,47 @@ docker compose down
 
 If conversion fails with a missing model error, confirm that
 `.isolation/models/transcription.onnx` exists before starting Compose.
+
+## Optional AI Setup
+
+AI Sketch is optional. To enable it, copy [`.env.example`](./.env.example) to
+`.env` and set at least one model key:
+
+- `DEEPSEEK_API_KEY` enables `deepseek-v4-pro`.
+- `XIAOMI_API_KEY` enables `mimo-v2.5-pro`.
+- `MIMO_API_KEY` is also accepted as a compatibility alias.
+
+The frontend never receives these keys. The Docker sidecar routes the selected
+model through OpenAI-compatible Chat Completions locally.
+
+If the page is running but AI Sketch reports that the service is unavailable,
+start the sidecar with:
+
+```bash
+docker compose up -d ai-sketch-service
+```
+
+MiMo Token Plan keys start with `tp-` and should use:
+
+```text
+MIMO_BASE_URL=https://token-plan-cn.xiaomimimo.com/v1
+```
+
+Pay-as-you-go keys start with `sk-` and should use the pay-as-you-go base URL
+from the Xiaomi console.
+
+## Current Limitations
+
+- Audio-to-MIDI quality depends on recording quality, polyphonic complexity,
+  background noise, instrument clarity, and the selected engine.
+- Compare mode is an audition workflow. It helps you listen to and inspect
+  outputs, but it does not judge which engine is better.
+- Smart Score cleanup and presets are conservative MIDI utilities, not a full
+  score layout system or professional orchestration tool.
+- Sketch mode exports fixed-length MIDI sketches. It is not a full Strudel live
+  coding REPL and does not support arbitrary sample playback.
+- Shared deployments should add Docker CPU and memory limits before exposing
+  the backend or sidecar services beyond localhost.
 
 ## Current Status
 
@@ -193,12 +198,12 @@ If conversion fails with a missing model error, confirm that
   implemented.
 - Sketch mode: docked code-to-MIDI IDE, fixed-length Strudel pattern export,
   example patterns, local draft controls, MIDI preview, source load, download,
-  and generated note activity are implemented through a Docker-isolated sidecar.
+  editor diagnostics, contextual AI diagnostic fix, and generated note activity
+  are implemented through Docker-isolated services.
 - Optional AI Sketch: `deepseek-v4-pro` and `mimo-v2.5-pro` can generate
   editable Strudel pattern drafts when the matching local API key is configured.
   The same local sidecar can explain, edit, or summarize the current MIDI into
-  Strudel code without automatically generating MIDI. MiMo uses a compact
-  sketch-spec builder internally for reliability.
+  Strudel code without automatically generating MIDI.
 - Development workflow: Docker isolation, frontend CI, backend CI, and GitHub
   Pages deploy are configured.
 
@@ -242,6 +247,7 @@ experiments/
 
 - Three.js
 - MIDI.js
+- CodeMirror 5
 - Spring Boot
 - Maven
 - FFmpeg
