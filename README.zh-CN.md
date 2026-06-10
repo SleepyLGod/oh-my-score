@@ -68,7 +68,7 @@ Pages workflow 会发布 [`apps/piano-player`](./apps/piano-player/)。
 
 GitHub Pages 和 Vercel 会把 Oh-My-Score 作为静态前端预览运行。托管静态页面支持 demo MIDI playback、local MIDI opening、Smart Score analysis、timeline review、cleanup，以及对已加载 MIDI 的 preset exports。
 
-Audio transcription、Basic Pitch、Compare mode、Strudel MIDI generation 和 AI Sketch 需要本地 Docker services。需要完整工作流时，请用 `docker compose up --build` 启动本地 studio。
+音频转录、Basic Pitch、Compare mode、Strudel MIDI generation 和 AI Sketch 需要本地 Docker 服务。需要完整工作流时，请用 `docker compose up --build` 启动本地 studio。
 
 ## 隔离本地运行
 
