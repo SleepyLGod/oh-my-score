@@ -78,6 +78,9 @@ var saveStrudelDraftButton = document.getElementById("save-strudel-draft-button"
 var loadStrudelDraftButton = document.getElementById("load-strudel-draft-button");
 var duplicateStrudelDraftButton = document.getElementById("duplicate-strudel-draft-button");
 var findStrudelButton = document.getElementById("find-strudel-button");
+var replaceStrudelButton = document.getElementById("replace-strudel-button");
+var strudelSnippetSelect = document.getElementById("strudel-snippet");
+var insertStrudelSnippetButton = document.getElementById("insert-strudel-snippet-button");
 var resetStrudelExampleButton = document.getElementById("reset-strudel-example-button");
 var tidyStrudelButton = document.getElementById("tidy-strudel-button");
 var clearStrudelButton = document.getElementById("clear-strudel-button");
@@ -236,6 +239,19 @@ const melody = note(seq("D4", "F4", "A4", "G4", "F4", "D4")).slow(2);
 const drone = note(seq("D2")).slow(8);
 
 export const pattern = stack(drone, melody);
+export default pattern;
+`
+};
+var strudelSnippets = {
+    melody: `const melody = note(seq("C4", "D4", "E4", "G4", "A4", "G4", "E4", "D4"));
+`,
+    bass: `const bass = note(seq("C2", "G1", "A1", "F1")).slow(2);
+`,
+    "chord-pulse": `const chordRoot = note(seq("C3", "F3", "A2", "G2")).slow(2);
+const chordThird = note(seq("E3", "A3", "C3", "B2")).slow(2);
+const chordFifth = note(seq("G3", "C4", "E3", "D3")).slow(2);
+`,
+    "pattern-export": `export const pattern = stack(bass, melody);
 export default pattern;
 `
 };
@@ -779,8 +795,59 @@ function openStrudelSearch() {
     focusStrudelEditor();
 }
 
+function openStrudelReplace() {
+    if (strudelEditor && window.CodeMirror && window.CodeMirror.commands.replace) {
+        strudelEditor.focus();
+        strudelEditor.execCommand("replace");
+        return;
+    }
+    setStrudelStatus("Replace requires the code editor.");
+    focusStrudelEditor();
+}
+
+function selectedStrudelSnippetText() {
+    var key = strudelSnippetSelect ? strudelSnippetSelect.value : "melody";
+    return strudelSnippets[key] || strudelSnippets.melody;
+}
+
+function insertTextIntoStrudelTextarea(text) {
+    if (!strudelCodeInput) return;
+    var start = typeof strudelCodeInput.selectionStart === "number"
+        ? strudelCodeInput.selectionStart
+        : strudelCodeInput.value.length;
+    var end = typeof strudelCodeInput.selectionEnd === "number"
+        ? strudelCodeInput.selectionEnd
+        : start;
+    var value = strudelCodeInput.value;
+    strudelCodeInput.value = value.slice(0, start) + text + value.slice(end);
+    strudelCodeInput.selectionStart = start + text.length;
+    strudelCodeInput.selectionEnd = start + text.length;
+    handleStrudelEditorChange();
+    strudelCodeInput.focus();
+}
+
+function insertStrudelSnippet() {
+    var snippet = selectedStrudelSnippetText();
+    if (!snippet) {
+        setStrudelStatus("No snippet selected.");
+        return;
+    }
+    if (strudelEditor) {
+        strudelEditor.focus();
+        strudelEditor.replaceSelection(snippet, "around");
+    } else {
+        insertTextIntoStrudelTextarea(snippet);
+    }
+    resetStrudelResult("Snippet inserted. Generate MIDI when ready.");
+}
+
 function strudelEditorElement() {
     return strudelEditor ? strudelEditor.getWrapperElement() : strudelCodeInput;
+}
+
+function clearStaleStrudelOutputAfterEditorChange() {
+    if (!strudelResult || (strudelResult.hidden && !strudelMidiUrl && !strudelMidiBlob)) return;
+    resetStrudelResult();
 }
 
 function handleStrudelEditorChange() {
@@ -788,6 +855,7 @@ function handleStrudelEditorChange() {
     if (latestStrudelDiagnostic) {
         clearStrudelDiagnostic();
     }
+    clearStaleStrudelOutputAfterEditorChange();
 }
 
 function strudelEditorShortcut(editor, event) {
@@ -805,6 +873,11 @@ function strudelEditorShortcut(editor, event) {
     if (String(event.key || "").toLowerCase() === "f" && strudelEditor) {
         event.preventDefault();
         openStrudelSearch();
+        return;
+    }
+    if (String(event.key || "").toLowerCase() === "h") {
+        event.preventDefault();
+        openStrudelReplace();
     }
 }
 
@@ -835,7 +908,9 @@ function initializeStrudelEditor() {
             "Cmd-S": saveStrudelDraft,
             "Ctrl-S": saveStrudelDraft,
             "Cmd-F": "findPersistent",
-            "Ctrl-F": "findPersistent"
+            "Ctrl-F": "findPersistent",
+            "Cmd-H": openStrudelReplace,
+            "Ctrl-H": openStrudelReplace
         }
     });
     strudelEditor.on("change", handleStrudelEditorChange);
@@ -4322,6 +4397,8 @@ window.onload = function () {
     loadStrudelDraftButton.onclick = loadStrudelDraft;
     duplicateStrudelDraftButton.onclick = duplicateStrudelDraft;
     findStrudelButton.onclick = openStrudelSearch;
+    replaceStrudelButton.onclick = openStrudelReplace;
+    insertStrudelSnippetButton.onclick = insertStrudelSnippet;
     tidyStrudelButton.onclick = tidyStrudelSource;
     clearStrudelButton.onclick = clearStrudelSource;
     strudelDiagnosticJumpButton.onclick = jumpToStrudelDiagnostic;

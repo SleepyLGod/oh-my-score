@@ -730,10 +730,24 @@ body.is-resizing-sketch .sketch-resizer::after {
     display: none;
 }
 .sketch-editor-actions {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
     gap: 8px;
     margin: 0;
+}
+.sketch-editor-actions .secondary-button,
+.sketch-snippet-select {
+    min-height: 32px;
+    padding: 0 9px;
+    font-size: 11px;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+.sketch-snippet-select {
+    width: 136px;
+    color: var(--text);
 }
 body.sketch-mode #strudel-code {
     height: 100%;

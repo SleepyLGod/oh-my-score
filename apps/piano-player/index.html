@@ -37,7 +37,7 @@
 
         <link rel="stylesheet" href="./vendor/codemirror/lib/codemirror.css">
         <link rel="stylesheet" href="./vendor/codemirror/addon/dialog/dialog.css">
-        <link rel="stylesheet" href="./styles/player.css?v=diagnostic-fix-v1">
+        <link rel="stylesheet" href="./styles/player.css?v=editor-productivity-v2">
     </head>
     <body>
         <div id="scene-vignette"></div>
@@ -221,6 +221,14 @@
                                 </div>
                                 <div class="sketch-editor-actions">
                                     <button id="find-strudel-button" class="secondary-button" type="button">Find</button>
+                                    <button id="replace-strudel-button" class="secondary-button" type="button">Replace</button>
+                                    <select id="strudel-snippet" class="sketch-snippet-select" aria-label="Snippet">
+                                        <option value="melody">Melody layer</option>
+                                        <option value="bass">Bass layer</option>
+                                        <option value="chord-pulse">Chord pulse</option>
+                                        <option value="pattern-export">Pattern export</option>
+                                    </select>
+                                    <button id="insert-strudel-snippet-button" class="secondary-button" type="button">Insert</button>
                                     <button id="reset-strudel-example-button" class="secondary-button" type="button">Reset example</button>
                                     <button id="tidy-strudel-button" class="secondary-button" type="button">Tidy</button>
                                     <button id="clear-strudel-button" class="secondary-button" type="button">Clear</button>
@@ -231,7 +239,7 @@
                                 <span id="strudel-cursor-status" aria-hidden="true">Ln 1, Col 1</span>
                                 <span id="strudel-character-status" aria-hidden="true">0 chars</span>
                                 <span id="strudel-dirty-status" aria-live="polite">Saved</span>
-                                <span class="strudel-shortcut-hint">Cmd/Ctrl+F Find · Cmd/Ctrl+Enter Generate · Cmd/Ctrl+S Save</span>
+                                <span class="strudel-shortcut-hint">Cmd/Ctrl+F Find · Cmd/Ctrl+H Replace · Cmd/Ctrl+Enter Generate · Cmd/Ctrl+S Save</span>
                             </div>
                         </div>
                         <aside class="sketch-side-pane">
@@ -540,6 +548,6 @@
         <script src="./vendor/codemirror/addon/dialog/dialog.js" type="text/javascript"></script>
         <script src="./vendor/codemirror/addon/search/searchcursor.js" type="text/javascript"></script>
         <script src="./vendor/codemirror/addon/search/search.js" type="text/javascript"></script>
-        <script src="./scripts/player.js?v=diagnostic-fix-v1" type="text/javascript"></script>
+        <script src="./scripts/player.js?v=editor-productivity-v2" type="text/javascript"></script>
     </body>
 </html>

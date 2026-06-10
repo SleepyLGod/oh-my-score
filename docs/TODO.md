@@ -367,6 +367,10 @@ AI diagnostic fix status: V1 done. The Strudel diagnostic panel can offer a
 contextual Fix with AI action that reuses the existing `/edit` flow, replaces
 editor source only after validation, and leaves MIDI generation explicit.
 
+Sketch editor replace/snippets status: V1 done. The CodeMirror editor supports
+local replace plus simple Strudel snippet insertion for melody, bass, chord
+pulse, and pattern export fragments without changing MIDI generation semantics.
+
 Cleanup controls status: V1 done. Smart Score cleanup now exposes short-note,
 duplicate-overlap, and velocity normalization controls while preserving the
 previous default behavior and keeping cleaned MIDI as a separate variant.
@@ -392,9 +396,9 @@ Acceptance criteria:
 The main V1 workflow is complete. Future work should be picked deliberately from
 this backlog instead of being treated as the next required step:
 
-1. Consider deeper Strudel editor features such as replace, lint diagnostics, or
-   multi-file snippets only if code-to-MIDI sketching becomes a frequent
-   workflow; keep it separate from transcription claims.
+1. Consider continuous Strudel lint diagnostics or multi-file snippets only if
+   code-to-MIDI sketching becomes a frequent workflow; keep it separate from
+   transcription claims.
 2. Verify an optional Vercel static deployment only after a project is linked;
    GitHub Pages remains the primary hosted demo for now.
 3. Keep MT3-style multi-instrument transcription as future research until there
