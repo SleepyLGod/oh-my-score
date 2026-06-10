@@ -45,6 +45,32 @@ The project is built for local-first experimentation: the full stack runs
 through Docker, while the static frontend can also be published as a GitHub
 Pages demo for MIDI playback and UI exploration.
 
+## Who It Is For
+
+Oh-My-Score is intended for people who want a local, inspectable MIDI workflow,
+including:
+
+- Piano learners who want to turn practice recordings into playable MIDI for review.
+- MIDI hobbyists who like inspecting, cleaning, remixing, and exporting MIDI files.
+- DAW and MuseScore users who want downloadable MIDI they can continue editing in
+  their existing tools.
+- Local AI and music tooling experimenters who want Docker-isolated transcription,
+  sketching, and optional AI-assisted pattern drafts.
+- Developers evaluating transcription engines and comparing their outputs by
+  listening, loading, and inspecting generated MIDI.
+
+## Current Limitations
+
+- Audio-to-MIDI transcription quality depends on recording quality, polyphonic
+  complexity, background noise, instrument clarity, and the capabilities of the
+  selected model or engine.
+- Compare mode helps you listen to and inspect multiple engine outputs side by
+  side; it does not automatically judge which engine is better or choose a
+  winner for you.
+- Smart Score cleanup and presets are conservative MIDI utilities for analysis,
+  cleanup, and quick General MIDI variants; they are not a complete score layout
+  system or professional orchestration tool.
+
 ## What You Can Do
 
 - Convert MP3/WAV audio into standard MIDI files.
