@@ -1,9 +1,10 @@
 # Oh-My-Score TODO: Smart Score Roadmap
 
 This document tracks the next product direction for Oh-My-Score: turning raw MIDI
-or transcribed piano audio into cleaner, more useful score material. The first
-phase should stay MIDI-first. Full arbitrary-song, multi-instrument audio
-transcription is research scope, not a short-term product promise.
+or transcribed piano audio into cleaner, more useful score material, then adding
+a separate song-map layer for harmony and rehearsal context. The first phase
+stays MIDI-first. Full arbitrary-song, multi-instrument audio transcription is
+research scope, not a short-term product promise.
 
 ## PM View
 
@@ -30,12 +31,15 @@ leaving the browser.
   not as professional orchestration claims.
 - P2: Improve playback control for score review. Timeline and seek matter more
   than more visual effects.
+- P2/P3: Add Song Map / Chord Map research. This is a harmony, section, and
+  lyric-timing workflow, not another MP3-to-MIDI engine.
 - P3: Research alternative transcription engines only after the MIDI workflow is
   stable.
 
 ### Explicit Non-Goals For V1
 
 - Do not promise full MP3-to-multi-instrument sheet music for arbitrary songs.
+- Do not present chord and lyric alignment as exact score reconstruction.
 - Do not add a large ML model service before the current backend workflow has
   long-running job handling and profiling.
 - Do not label simple MIDI program changes as professional arrangement.
@@ -88,6 +92,23 @@ Engine boundaries:
   audio-to-MIDI conversion.
 - MT3-style models: research only. Multi-instrument transcription requires a
   larger model service, longer processing, and a clearer UI contract.
+
+### Song Map Direction
+
+Song Map / Chord Map is a parallel analysis layer, not a replacement for
+MP3/WAV-to-MIDI:
+
+- MP3/WAV to MIDI: current product capability. It outputs note events that can
+  be played, cleaned, arranged, and exported.
+- Chord Map: future research direction. It outputs BPM/key, section boundaries,
+  chord timeline, and line-level lyric timestamps for rehearsal and arrangement
+  context.
+- MT3-style transcription: future research. It targets multi-instrument
+  note-level transcription and needs a heavier runtime and clearer UI contract.
+
+Chord Map results should eventually become selectable time ranges that can be
+played, inspected, and passed into AI arrangement chat. V1 should prove the data
+pipeline first with JSON and Markdown reports before adding UI.
 
 ### Data Model Direction
 
@@ -391,6 +412,38 @@ Acceptance criteria:
   until the backend and export path actually prove it.
 - Research output documents integration risk before a new engine is implemented.
 
+### P2/P3: Song Map / Chord Map Research
+
+Goal: add a musician-readable song map that explains harmony, structure, and
+lyrics alongside audio playback.
+
+Status: design V1 documented in
+[`docs/research/chord-map-v1.md`](./research/chord-map-v1.md). Prototype work
+has not started.
+
+Implementation scope:
+
+- Treat this as a Docker-isolated research prototype before any frontend or
+  backend product integration.
+- Extract BPM/key, beat grid, chord timeline, section candidates, and line-level
+  lyric timestamps into a JSON artifact.
+- Produce a Markdown report that explains warnings, confidence, and missing
+  inputs.
+- Keep output separate from MIDI conversion. Chord Map does not overwrite MIDI
+  source, cleaned MIDI, preset MIDI, or Sketch output.
+- Use the result later as context for segment playback and AI arrangement chat.
+
+Acceptance criteria:
+
+- A short MP3/WAV can produce a chord-map JSON artifact or a clear blocker
+  report.
+- The JSON includes duration, BPM/key/mode, section candidates, chord spans,
+  lyric lines, and warnings.
+- The report clearly states that the result is a lead-sheet style song map, not
+  complete multi-instrument sheet music.
+- Existing Transcribe, Compare, Smart Score, and Sketch workflows remain
+  unchanged until the prototype is proven.
+
 ## Optional Backlog
 
 The main V1 workflow is complete. Future work should be picked deliberately from
@@ -401,5 +454,10 @@ this backlog instead of being treated as the next required step:
    transcription claims.
 2. Verify an optional Vercel static deployment only after a project is linked;
    GitHub Pages remains the primary hosted demo for now.
-3. Keep MT3-style multi-instrument transcription as future research until there
+3. Build a Docker-only Song Map / Chord Map prototype that outputs JSON and a
+   Markdown report before adding UI.
+4. Add segment-level AI arrangement chat only after Chord Map output is stable.
+5. Add editable section labels, manual chord correction, and confidence review
+   only after the first Chord Map UI exists.
+6. Keep MT3-style multi-instrument transcription as future research until there
    is a reproducible Docker prototype and a clear UI contract.
