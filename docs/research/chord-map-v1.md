@@ -94,10 +94,14 @@ The prototype should write:
 
 Candidate technical path:
 
-- Use FFmpeg to normalize MP3/WAV into a consistent mono analysis WAV.
+- Use FFmpeg to normalize MP3/WAV into a consistent mono analysis WAV when it
+  is available; the lean smoke image may let Essentia read the source file
+  directly and report that fallback as a warning.
 - Use an MIR library such as Essentia or an Omnizart-style pipeline for BPM,
   beat grid, key, and chord candidates.
-- Use whisper.cpp or WhisperX-style ASR for line-level lyric timestamps.
+- Use whisper.cpp or WhisperX-style ASR for line-level lyric timestamps when
+  the ASR runtime is available; the first lean Docker prototype may emit empty
+  lyrics with an explicit warning.
 - Generate section candidates from chord changes, beat grid, energy/silence,
   lyric boundaries, and repeated harmonic patterns.
 - Keep all model files, caches, and generated outputs under `.isolation/`.
@@ -124,7 +128,7 @@ is stable.
 
 - A short MP3/WAV produces a valid `song-map.json` or a clear blocker report.
 - The artifact includes duration, BPM/key/mode, section candidates, chord spans,
-  lyric lines, and warnings.
+  lyric lines when ASR is available, and warnings.
 - The generated Markdown report states that Chord Map is a lead-sheet style
   analysis, not complete multi-instrument sheet music.
 - Existing MP3-to-MIDI, Compare, Smart Score, cleanup, preset, timeline, and
@@ -140,9 +144,11 @@ is stable.
   related to AMT, which makes it relevant for research even if it is not chosen
   as the V1 runtime.
 - whisper.cpp is attractive for local Docker experiments because it provides an
-  offline ASR runtime and CLI path. WhisperX is relevant when word-level or
-  tighter timestamp alignment becomes important, but V1 should only require
-  line-level lyrics.
+  offline ASR runtime and CLI path. The lean V1 image keeps FFmpeg and ASR
+  optional so BPM, key, chord, and section analysis can be validated without a
+  heavy build. WhisperX is relevant when word-level or tighter timestamp
+  alignment becomes important, but V1 should only require line-level lyrics when
+  ASR is enabled.
 
 ## Sources
 

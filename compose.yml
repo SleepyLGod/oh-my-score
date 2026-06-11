@@ -109,3 +109,16 @@ services:
       - ./.isolation/strudel-sketch/input:/workspace/input
       - ./.isolation/strudel-sketch/output:/workspace/output
     working_dir: /workspace/experiment
+
+  chord-map:
+    platform: linux/amd64
+    profiles:
+      - research
+    build:
+      context: .
+      dockerfile: experiments/chord-map/Dockerfile
+    volumes:
+      - ./.isolation/chord-map/input:/workspace/input
+      - ./.isolation/chord-map/output:/workspace/output
+      - ./.isolation/chord-map/cache:/workspace/cache
+    working_dir: /workspace

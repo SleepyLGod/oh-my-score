@@ -418,15 +418,16 @@ Goal: add a musician-readable song map that explains harmony, structure, and
 lyrics alongside audio playback.
 
 Status: design V1 documented in
-[`docs/research/chord-map-v1.md`](./research/chord-map-v1.md). Prototype work
-has not started.
+[`docs/research/chord-map-v1.md`](./research/chord-map-v1.md). Docker research
+prototype V1 added under `experiments/chord-map/` for isolated JSON and
+Markdown artifact generation.
 
 Implementation scope:
 
 - Treat this as a Docker-isolated research prototype before any frontend or
   backend product integration.
 - Extract BPM/key, beat grid, chord timeline, section candidates, and line-level
-  lyric timestamps into a JSON artifact.
+  lyric timestamps into a JSON artifact when ASR is enabled.
 - Produce a Markdown report that explains warnings, confidence, and missing
   inputs.
 - Keep output separate from MIDI conversion. Chord Map does not overwrite MIDI
@@ -438,7 +439,7 @@ Acceptance criteria:
 - A short MP3/WAV can produce a chord-map JSON artifact or a clear blocker
   report.
 - The JSON includes duration, BPM/key/mode, section candidates, chord spans,
-  lyric lines, and warnings.
+  lyric lines when ASR is available, and warnings.
 - The report clearly states that the result is a lead-sheet style song map, not
   complete multi-instrument sheet music.
 - Existing Transcribe, Compare, Smart Score, and Sketch workflows remain
@@ -454,8 +455,8 @@ this backlog instead of being treated as the next required step:
    transcription claims.
 2. Verify an optional Vercel static deployment only after a project is linked;
    GitHub Pages remains the primary hosted demo for now.
-3. Build a Docker-only Song Map / Chord Map prototype that outputs JSON and a
-   Markdown report before adding UI.
+3. Add a first read-only Chord Map UI only after several real short samples
+   produce useful JSON artifacts.
 4. Add segment-level AI arrangement chat only after Chord Map output is stable.
 5. Add editable section labels, manual chord correction, and confidence review
    only after the first Chord Map UI exists.
