@@ -16,6 +16,7 @@ RUN python -m pip install --upgrade pip \
 WORKDIR /workspace
 
 COPY experiments/chord-map/run-chord-map.py /usr/local/bin/run-chord-map
-RUN chmod +x /usr/local/bin/run-chord-map
+COPY experiments/chord-map/mock-whisper-cli.py /usr/local/bin/mock-whisper-cli
+RUN chmod +x /usr/local/bin/run-chord-map /usr/local/bin/mock-whisper-cli
 
 ENTRYPOINT ["run-chord-map"]
