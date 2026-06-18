@@ -417,10 +417,19 @@ Acceptance criteria:
 Goal: add a musician-readable song map that explains harmony, structure, and
 lyrics alongside audio playback.
 
-Status: design V1 documented in
-[`docs/research/chord-map-v1.md`](./research/chord-map-v1.md). Docker research
-prototype V1 added under `experiments/chord-map/` for isolated JSON and
-Markdown artifact generation.
+Status: design V1 is documented in
+[`docs/research/chord-map-v1.md`](./research/chord-map-v1.md), and a
+Docker-isolated prototype under `experiments/chord-map/` now writes
+`song-map.json`, `raw-chords.json`, and Markdown reports. The current output
+separates harmony review from lyric ASR: `harmonyReliability` says whether a
+smoothed chord timeline is worth reviewing, while `lyricsStatus` says whether
+Whisper produced real, mock, skipped, failed, or empty lyric lines.
+Reference-gated evaluators report ASR WER/CER and chord accuracy only when
+local reference files exist. Current evidence is mixed: a solo Star-Spangled
+sample reports WER/CER metrics, a choral sample is much noisier, La Marseillaise
+has timed captions but can still produce no lyric lines after marker filtering,
+and GuitarSet chord accuracy varies by style. This is not ready for a product
+Chord Map UI yet.
 
 Implementation scope:
 
@@ -428,8 +437,32 @@ Implementation scope:
   backend product integration.
 - Extract BPM/key, beat grid, chord timeline, section candidates, and line-level
   lyric timestamps into a JSON artifact when ASR is enabled.
+- Smooth raw chord spans before product consumption: merge short flickers,
+  lightly snap boundaries to nearby beats, and normalize enharmonic labels for
+  the detected key.
 - Produce a Markdown report that explains warnings, confidence, and missing
   inputs.
+- Produce a local `review-summary.md` across sample outputs so Chord Map quality
+  can be evaluated before any UI work.
+- Produce a local `quality-summary.md` across sample outputs so reference-based
+  ASR and chord accuracy can be reviewed separately from harmony reliability.
+- Include a harmony reliability assessment in `song-map.json`, `report.md`, and
+  `review-summary.md` using general signals such as average chord confidence,
+  chord density, short spans, confident chord coverage, and percussion-like
+  input.
+- Include a separate lyrics status in `song-map.json`, `report.md`, and
+  `review-summary.md` so mock ASR and missing real ASR are not confused with
+  real lyric alignment.
+- Filter pure ASR marker/caption output before writing `lyrics[]`; non-lyric
+  outputs should produce `lyricsStatus: empty`, not `available`.
+- Include ASR and chord evaluators that only compute quality metrics when local
+  reference files exist under `.isolation/chord-map/reference/`.
+- Include a small public song ASR reference prep script that downloads
+  public-domain singing samples and writes local-only lyric references plus a
+  manifest under `.isolation/chord-map/`.
+- Include `useCase` values such as `lead-sheet-friendly`, `harmonic-review`,
+  `percussive-blocked`, and `insufficient-harmony` so future UI can distinguish
+  draft chord charts from dense harmony review.
 - Keep output separate from MIDI conversion. Chord Map does not overwrite MIDI
   source, cleaned MIDI, preset MIDI, or Sketch output.
 - Use the result later as context for segment playback and AI arrangement chat.
@@ -440,8 +473,20 @@ Acceptance criteria:
   report.
 - The JSON includes duration, BPM/key/mode, section candidates, chord spans,
   lyric lines when ASR is available, and warnings.
+- Chord spans in `song-map.json` are smoothed, human-readable spans; raw MIR
+  frame output remains research-only.
+- Harmony reliability marks usable outputs as `useful`, weak outputs as
+  `noisy`, and unsuitable outputs as `blocked` without claiming exact accuracy.
+- Review summaries show harmony reliability, use case, lyrics status, and
+  reasons in one table.
+- Quality summaries show ASR quality, chord quality, and blockers separately;
+  missing references must be marked `not-evaluated`.
+- At least one real singing sample with a real lyric reference should enter
+  `evaluated` ASR status and report WER/CER before any lyric UI is proposed.
 - The report clearly states that the result is a lead-sheet style song map, not
   complete multi-instrument sheet music.
+- ASR may be smoke-tested with mounted `whisper.cpp`; absent ASR remains a clear
+  warning, not a blocker.
 - Existing Transcribe, Compare, Smart Score, and Sketch workflows remain
   unchanged until the prototype is proven.
 
@@ -456,7 +501,7 @@ this backlog instead of being treated as the next required step:
 2. Verify an optional Vercel static deployment only after a project is linked;
    GitHub Pages remains the primary hosted demo for now.
 3. Add a first read-only Chord Map UI only after several real short samples
-   produce useful JSON artifacts.
+   produce reviewable smoothed JSON artifacts.
 4. Add segment-level AI arrangement chat only after Chord Map output is stable.
 5. Add editable section labels, manual chord correction, and confidence review
    only after the first Chord Map UI exists.
