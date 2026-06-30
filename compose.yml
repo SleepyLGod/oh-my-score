@@ -122,3 +122,14 @@ services:
       - ./.isolation/chord-map/output:/workspace/output
       - ./.isolation/chord-map/cache:/workspace/cache
     working_dir: /workspace
+
+  chord-map-whisper-setup:
+    platform: linux/amd64
+    profiles:
+      - research
+    build:
+      context: .
+      dockerfile: experiments/chord-map/whisper-setup.Dockerfile
+    volumes:
+      - ./.isolation/chord-map/cache:/workspace/cache
+    working_dir: /workspace
